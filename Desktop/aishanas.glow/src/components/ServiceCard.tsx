@@ -9,6 +9,9 @@ interface ServiceCardProps {
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({ service, shouldShowImage, handleBookClick }) => {
+  const [showDesc, setShowDesc] = React.useState(false);
+  const shortSummary = service.description ? service.description.split(' ').slice(0,6).join(' ') + (service.description.split(' ').length > 6 ? '…' : '') : '';
+
   return (
     <div className="border border-charcoal/15 bg-white p-4 shadow-sm rounded-lg flex flex-col items-start cursor-pointer" onClick={() => handleBookClick(service, 'full')}>
       {shouldShowImage && service.imageUrl && (
@@ -21,11 +24,21 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, shouldShowIma
         />
       )}
       <p className="font-serif text-xl text-charcoal">{service.name}</p>
-      <p className="mt-1 text-sm text-taupe">{service.description}</p>
+      {/* Info button to toggle description */}
+      <button
+        type="button"
+        className="mt-1 text-sm text-blue-600 underline"
+        onClick={(e) => { e.stopPropagation(); setShowDesc(!showDesc); }}
+      >
+        {showDesc ? 'Masquer' : 'Info'}
+      </button>
+      {showDesc && (
+        <p className="mt-1 text-sm text-taupe">{shortSummary}</p>
+      )}
       <div className="mt-3 flex gap-2 w-full">
         <button
           type="button"
-          onClick={() => handleBookClick(service, 'full')}
+          onClick={(e) => { e.stopPropagation(); handleBookClick(service, 'full'); }}
           className="flex-1 min-h-[44px] border border-stone/70 px-3 py-2 text-left hover:border-charcoal hover:bg-ivory"
         >
           <span className="text-[11px] text-taupe uppercase">Pose</span>{' '}
