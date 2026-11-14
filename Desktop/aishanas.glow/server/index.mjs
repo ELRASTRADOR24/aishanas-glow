@@ -302,18 +302,22 @@ function loadStudio() {
   return memoryStudio;
 }
 
-function saveStudio(studio) {
+async function saveStudio(studio) {
   memoryStudio = studio;
   writeJsonSafe(STUDIO_FILE, studio);
-  getMongoConnection().then((connected) => {
+  try {
+    const connected = await getMongoConnection();
     if (connected) {
-      StudioModel.findOneAndUpdate(
+      await StudioModel.findOneAndUpdate(
         { key: 'main' },
         { data: studio, updatedAt: new Date() },
         { upsert: true }
-      ).catch((err) => console.warn('[MongoDB Studio Save Error]:', err?.message));
+      );
+      console.log('[MongoDB Atlas] Studio data saved successfully to database.');
     }
-  }).catch(() => {});
+  } catch (err) {
+    console.warn('[MongoDB Studio Save Error]:', err?.message);
+  }
 }
 
 let memorySecrets = null;
@@ -1325,7 +1329,7 @@ app.get('/api/admin/studio', requireAdmin, (_req, res) => {
   res.json(buildAdminStudio(studio));
 });
 
-app.put('/api/admin/studio', requireAdmin, (req, res) => {
+app.put('/api/admin/studio', requireAdmin, async (req, res) => {
   const studio = loadStudio();
   const body = req.body || {};
 
@@ -1352,7 +1356,7 @@ app.put('/api/admin/studio', requireAdmin, (req, res) => {
   if (Array.isArray(body.faqs)) studio.faqs = body.faqs;
   if (Array.isArray(body.bookings)) studio.bookings = body.bookings;
 
-  writeJsonSafe(STUDIO_FILE, studio);
+  await saveStudio(studio);
   res.json(buildAdminStudio(studio));
 });
 

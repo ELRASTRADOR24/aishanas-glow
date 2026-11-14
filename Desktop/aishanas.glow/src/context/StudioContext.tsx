@@ -251,6 +251,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           addons: nextData.addons,
           protocols: nextData.protocols,
           media: nextData.media,
+          faqs: nextData.faqs,
           bookings: nextData.bookings,
         }),
       });
