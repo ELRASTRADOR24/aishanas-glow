@@ -4,7 +4,7 @@
     "handle": "@alshanas.glow",
     "instagramUrl": "https://www.instagram.com/alshanas.glow/",
     "tagline": "Extensions de cils & Rehaussement de cils",
-    "locationLine": "2 rue du Général Gallieni, 85000 La Roche-sur-Yon",
+    "locationLine": "À deux pas de la Place Napoléon, La Roche-sur-Yon",
     "exactStudioAddress": "2 rue du Général Gallieni, 85000 La Roche-sur-Yon",
     "city": "La Roche-sur-Yon (85000)",
     "certificationLine": "Technicienne certifiée 3x",
@@ -84,7 +84,7 @@
       "durationMinutes": 120,
       "description": "Association harmonieuse de cil à cil et de bouquets 4D pour un regard texturé et étoffé.",
       "note": "Pas de remplissages successifs possibles",
-      "imageUrl": "/srv-pose-mixte.jpg",
+      "imageUrl": "https://res.cloudinary.com/dvecpg1tz/image/upload/f_auto,q_auto/v1794696368/alshanas-glow/wyuwptjnf49zv20wjmrb.webp",
       "showImage": true,
       "supportsLashOptions": true,
       "active": true
@@ -314,6 +314,14 @@
   ],
   "media": [
     {
+      "id": "med-1794696369750",
+      "label": "Pose mixte (cil à cil + 4D) — BB7F8C82-01C8-4787-9817-E05E1235678E",
+      "url": "https://res.cloudinary.com/dvecpg1tz/image/upload/f_auto,q_auto/v1794696368/alshanas-glow/wyuwptjnf49zv20wjmrb.webp",
+      "publicId": "alshanas-glow/wyuwptjnf49zv20wjmrb",
+      "category": "extensions",
+      "createdAt": "2026-11-14T22:46:09.750Z"
+    },
+    {
       "id": "med-illus-cil-a-cil",
       "label": "Illustration — Cil à cil",
       "url": "/srv-cil-a-cil.jpg",
@@ -382,6 +390,38 @@
       "url": "/srv-blanchiment-2.jpg",
       "category": "blanchiment",
       "createdAt": "2026-11-11T22:10:00.000Z"
+    }
+  ],
+  "faqs": [
+    {
+      "id": "depose",
+      "question": "La dépose de cils est-elle gratuite ?",
+      "answer": "La dépose est 100% offerte si vous effectuez une nouvelle pose de cils au studio immédiatement après (option gratuite à cocher lors de votre réservation). La dépose seule sans nouvelle pose reste à 10 € pour un travail studio ou 15 € pour une pose extérieure.",
+      "active": true
+    },
+    {
+      "id": "remplissage",
+      "question": "Quel est le délai pour un remplissage ?",
+      "answer": "Le tarif remplissage est valable jusqu’à 3 semaines maximum après votre pose. Au-delà de 3 semaines, une nouvelle pose complète est requise pour assurer la santé de vos cils naturels et un résultat impeccable.",
+      "active": true
+    },
+    {
+      "id": "supplement",
+      "question": "Quels sont les créneaux avec supplément ?",
+      "answer": "Le studio applique un supplément de 10 € pour les créneaux en soirée (à partir de 19h00), ainsi que le dimanche et les jours fériés.",
+      "active": true
+    },
+    {
+      "id": "finitions",
+      "question": "Peut-on demander des cils marrons ou des décos ?",
+      "answer": "Oui, les poses en cils marrons (effet très doux et naturel) ainsi que les finitions paillettes et décos sont disponibles. Il suffit de l’indiquer dans les précisions de votre réservation.",
+      "active": true
+    },
+    {
+      "id": "duree-pose",
+      "question": "Combien de temps dure une prestation de cils ?",
+      "answer": "Chaque pose d’extensions de cils dure 2 heures pour garantir un travail soigné, précis cil par cil et une excellente tenue. Merci de venir sans maquillage des yeux pour optimiser la prise de la colle.",
+      "active": true
     }
   ],
   "bookings": [

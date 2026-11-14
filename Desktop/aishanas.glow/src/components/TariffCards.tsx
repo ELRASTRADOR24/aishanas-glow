@@ -102,8 +102,8 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                           </p>
                         )}
                         <div className="mt-2.5 flex items-center gap-2">
-                          <span className="inline-flex items-center border border-charcoal/10 bg-ivory/60 px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
-                            Durée : {service.category === 'extensions' ? '2h' : `${service.durationMinutes} min`}
+                          <span className="inline-flex items-center border border-charcoal/10 bg-ivory/60 px-2.5 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
+                            Durée : 2h
                           </span>
                         </div>
                       </div>

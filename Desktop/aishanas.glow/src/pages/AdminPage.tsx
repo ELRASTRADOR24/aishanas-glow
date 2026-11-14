@@ -1,18 +1,21 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
   ArrowUpRight,
   Calendar,
+  Check,
   CheckCircle2,
-  ChevronDown,
   Clock,
+  Crop,
   Download,
+  Edit2,
   Euro,
   Eye,
   EyeOff,
-  Image as ImageIcon,
+  Film,
+  Loader2,
   Lock,
   Mail,
   Plus,
@@ -32,7 +35,6 @@ import type {
   BookingStatus,
   EmailLogEntry,
   FaqItem,
-  MediaAsset,
   ProtocolBlock,
   ServiceAddon,
   ServiceCategory,
@@ -40,11 +42,22 @@ import type {
 } from '../types/studio';
 import { DEFAULT_FAQS } from '../data/defaultStudioData';
 import { formatFrenchDate } from '../utils/bookingLogic';
-import { isVideoUrl, optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/cloudinary';
+import { isVideoUrl } from '../utils/cloudinary';
+import { uploadMediaWithProgress } from '../utils/uploadMedia';
 import { AestheticMediaViewer } from '../components/AestheticMediaViewer';
 import { MonthlyScheduleCalendar } from '../components/MonthlyScheduleCalendar';
+import { ImageCropModal } from '../components/ImageCropModal';
 
-type AdminTab = 'dashboard' | 'bookings' | 'schedule' | 'emails' | 'services' | 'content' | 'cloudinary';
+type AdminTab =
+  | 'services'
+  | 'schedule'
+  | 'bookings'
+  | 'rules'
+  | 'content'
+  | 'emails'
+  | 'settings'
+  | 'dashboard'
+  | 'cloudinary';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   pending: 'En attente de validation',
@@ -205,7 +218,6 @@ export const AdminPage: React.FC = () => {
     logoutAdmin,
     updateConfig,
     upsertService,
-    updateServiceMedia,
     deleteService,
     upsertAddon,
     deleteAddon,
@@ -213,8 +225,6 @@ export const AdminPage: React.FC = () => {
     deleteProtocol,
     upsertFaq,
     deleteFaq,
-    addMediaAsset,
-    deleteMediaAsset,
     updateBookingDecision,
     deleteBooking,
     refreshAdminStudio,
@@ -237,9 +247,48 @@ export const AdminPage: React.FC = () => {
     }
   }, [data.config.contactEmail]);
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('services');
   const [statusMessage, setStatusMessage] = useState('');
   const [statusError, setStatusError] = useState('');
+
+  // Service Edit Modal & Direct Media State (YDM style)
+  const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceItem | null>(null);
+  const [isCreatingService, setIsCreatingService] = useState(false);
+  const [serviceForm, setServiceForm] = useState<{
+    name: string;
+    category: ServiceCategory;
+    fullPrice: number;
+    refillPrice: number | null;
+    durationMinutes: number;
+    description: string;
+    imageUrl: string;
+    showImage: boolean;
+    active: boolean;
+  }>({
+    name: '',
+    category: 'extensions',
+    fullPrice: 40,
+    refillPrice: null,
+    durationMinutes: 120,
+    description: '',
+    imageUrl: '',
+    showImage: true,
+    active: true,
+  });
+  const [savingService, setSavingService] = useState(false);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [showManualUrl, setShowManualUrl] = useState(false);
+
+  // File input refs for direct single-click triggering
+  const imageFileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Interactive 16:10 Image Cropping Modal State
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState('');
+  const [cropFileName, setCropFileName] = useState('photo-studio.webp');
 
   // Bookings filter & decision edits
   const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'all'>('all');
@@ -258,17 +307,6 @@ export const AdminPage: React.FC = () => {
 
   // Services accordion & filter
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
-  const [expandedServiceIds, setExpandedServiceIds] = useState<Set<string>>(new Set());
-
-  const toggleServiceExpanded = (id: string) => {
-    setExpandedServiceIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
   // Schedule rules inputs
   const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const [newHolidayDate, setNewHolidayDate] = useState('');
@@ -284,23 +322,6 @@ export const AdminPage: React.FC = () => {
     setContactEmailInput(data.config.contactEmail || '');
   }, [data.config.contactEmail]);
 
-  // New Service Form State
-  const [newService, setNewService] = useState<Omit<ServiceItem, 'id'>>({
-    category: 'extensions',
-    name: '',
-    subtitle: '',
-    fullPrice: 40,
-    fullLabel: 'Pose complète',
-    refillPrice: null,
-    refillLabel: 'Remplissage 3 semaines',
-    durationMinutes: 120,
-    description: '',
-    imageUrl: '',
-    showImage: true,
-    supportsLashOptions: false,
-    active: true,
-  });
-
   // New Addon Form State
   const [newAddonName, setNewAddonName] = useState('');
   const [newAddonDesc, setNewAddonDesc] = useState('');
@@ -314,14 +335,6 @@ export const AdminPage: React.FC = () => {
   // New FAQ Item State
   const [newFaqQuestion, setNewFaqQuestion] = useState('');
   const [newFaqAnswer, setNewFaqAnswer] = useState('');
-
-  // Cloudinary Upload State
-  const [uploading, setUploading] = useState(false);
-  const [uploadingServiceId, setUploadingServiceId] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState('');
-  const [manualMediaLabel, setManualMediaLabel] = useState('');
-  const [manualMediaUrl, setManualMediaUrl] = useState('');
-  const [manualMediaCat, setManualMediaCat] = useState<ServiceCategory | 'editorial'>('extensions');
 
   const notify = (msg: string) => {
     setStatusError('');
@@ -784,33 +797,6 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const handleAddService = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newService.name.trim()) return;
-    await upsertService({
-      ...newService,
-      id: `srv-${Date.now()}`,
-      name: newService.name.trim(),
-      description: newService.description.trim() || 'Prestation sur mesure.',
-    });
-    setNewService({
-      category: 'extensions',
-      name: '',
-      subtitle: '',
-      fullPrice: 40,
-      fullLabel: 'Pose complète',
-      refillPrice: null,
-      refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 120,
-      description: '',
-      imageUrl: '',
-      showImage: true,
-      supportsLashOptions: false,
-      active: true,
-    });
-    notify('Prestation ajoutée avec succès.');
-  };
-
   const handleAddAddon = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAddonName.trim()) return;
@@ -874,69 +860,143 @@ export const AdminPage: React.FC = () => {
     notify('Questions FAQ par défaut rétablies.');
   };
 
-  const handleCloudinaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const openCreateServiceModal = () => {
+    setEditingService(null);
+    setIsCreatingService(true);
+    setServiceForm({
+      name: '',
+      category: 'extensions',
+      fullPrice: 40,
+      refillPrice: null,
+      durationMinutes: 120,
+      description: '',
+      imageUrl: '',
+      showImage: true,
+      active: true,
+    });
+    setShowManualUrl(false);
+    setIsServiceModalOpen(true);
+  };
+
+  const openEditServiceModal = (service: ServiceItem) => {
+    setEditingService(service);
+    setIsCreatingService(false);
+    setServiceForm({
+      name: service.name,
+      category: service.category,
+      fullPrice: service.fullPrice,
+      refillPrice: service.refillPrice ?? null,
+      durationMinutes: 120, // 2h uniforme
+      description: service.description || '',
+      imageUrl: service.imageUrl || '',
+      showImage: service.showImage !== false,
+      active: service.active !== false,
+    });
+    setShowManualUrl(false);
+    setIsServiceModalOpen(true);
+  };
+
+  const handleSelectImageForCrop = (file: File) => {
     if (!file) return;
-    setUploadError('');
-    setUploading(true);
+    const objectUrl = URL.createObjectURL(file);
+    setCropImageSrc(objectUrl);
+    setCropFileName(file.name);
+    setCropModalOpen(true);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob, croppedFileName: string) => {
+    setUploadingMedia(true);
+    setUploadProgress(0);
     try {
-      const result = await uploadToCloudinary(file, data.config.cloudinary);
-      await addMediaAsset({
-        id: `med-${Date.now()}`,
-        label: file.name.replace(/\.[^.]+$/, ''),
-        url: result.secureUrl,
-        publicId: result.publicId,
-        category: manualMediaCat,
-        createdAt: new Date().toISOString(),
-      });
-      notify('Image envoyée vers Cloudinary et ajoutée à la bibliothèque.');
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Échec de l’envoi Cloudinary.');
+      const res = await uploadMediaWithProgress(
+        croppedBlob,
+        croppedFileName,
+        data.config.cloudinary,
+        (pct) => setUploadProgress(pct)
+      );
+      setServiceForm((prev) => ({
+        ...prev,
+        imageUrl: res.url,
+        showImage: true,
+      }));
+      notify('Photo recadrée et envoyée avec succès sur Cloudinary !');
+    } catch (err: any) {
+      notifyError(err?.message || "Erreur lors de l'envoi de la photo recadrée.");
     } finally {
-      setUploading(false);
-      e.target.value = '';
+      setUploadingMedia(false);
+      setUploadProgress(0);
     }
   };
 
-  const handleServiceMediaUpload = async (service: ServiceItem, file: File) => {
+  const handleRecropExistingImage = () => {
+    if (!serviceForm.imageUrl) return;
+    setCropImageSrc(serviceForm.imageUrl);
+    setCropFileName('photo-service.webp');
+    setCropModalOpen(true);
+  };
+
+  const handleSelectVideoUpload = async (file: File) => {
     if (!file) return;
-    setUploadingServiceId(service.id);
+    setUploadingMedia(true);
+    setUploadProgress(0);
     try {
-      const result = await uploadToCloudinary(file, data.config.cloudinary);
-      const mediaAsset: MediaAsset = {
-        id: `med-${Date.now()}`,
-        label: `${service.name} — ${file.name.replace(/\.[^.]+$/, '')}`,
-        url: result.secureUrl,
-        publicId: result.publicId,
-        category: service.category,
-        createdAt: new Date().toISOString(),
+      const res = await uploadMediaWithProgress(
+        file,
+        file.name,
+        data.config.cloudinary,
+        (pct) => setUploadProgress(pct)
+      );
+      setServiceForm((prev) => ({
+        ...prev,
+        imageUrl: res.url,
+        showImage: true,
+      }));
+      notify('Vidéo HD envoyée et associée avec succès à la prestation !');
+    } catch (err: any) {
+      notifyError(err?.message || "Erreur lors de l'envoi de la vidéo.");
+    } finally {
+      setUploadingMedia(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleSaveServiceModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!serviceForm.name.trim()) {
+      notifyError('Veuillez renseigner le nom de la prestation.');
+      return;
+    }
+    setSavingService(true);
+    try {
+      const servicePayload: ServiceItem = {
+        id: editingService ? editingService.id : `srv-${Date.now()}`,
+        category: serviceForm.category,
+        name: serviceForm.name.trim(),
+        subtitle: editingService?.subtitle || '',
+        fullPrice: Number(serviceForm.fullPrice) || 0,
+        fullLabel: editingService?.fullLabel || 'Pose complète',
+        refillPrice: serviceForm.refillPrice != null ? Number(serviceForm.refillPrice) : null,
+        refillLabel: editingService?.refillLabel || 'Remplissage 3 semaines',
+        durationMinutes: 120, // 2h uniforme
+        description: serviceForm.description.trim(),
+        imageUrl: serviceForm.imageUrl.trim(),
+        showImage: serviceForm.showImage,
+        active: serviceForm.active,
+        supportsLashOptions: editingService?.supportsLashOptions ?? false,
       };
-      await updateServiceMedia(service.id, result.secureUrl, mediaAsset);
+
+      await upsertService(servicePayload);
+      setIsServiceModalOpen(false);
       notify(
-        `${
-          result.resourceType === 'video' ? 'Vidéo' : 'Photo'
-        } téléversée avec succès sur Cloudinary et associée à ${service.name}.`
+        editingService
+          ? `Prestation « ${servicePayload.name} » mise à jour avec succès !`
+          : `Nouvelle prestation « ${servicePayload.name} » créée avec succès !`
       );
     } catch (err: any) {
-      notifyError(err?.message || 'Erreur lors du téléversement Cloudinary.');
+      notifyError(err?.message || "Erreur lors de l'enregistrement de la prestation.");
     } finally {
-      setUploadingServiceId(null);
+      setSavingService(false);
     }
-  };
-
-  const handleAddManualMedia = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualMediaUrl.trim()) return;
-    await addMediaAsset({
-      id: `med-${Date.now()}`,
-      label: manualMediaLabel.trim() || 'Visuel studio',
-      url: manualMediaUrl.trim(),
-      category: manualMediaCat,
-      createdAt: new Date().toISOString(),
-    });
-    setManualMediaLabel('');
-    setManualMediaUrl('');
-    notify('Média ajouté à la bibliothèque.');
   };
 
   const handleExportJson = () => {
@@ -1024,13 +1084,13 @@ export const AdminPage: React.FC = () => {
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto py-2">
           {(
             [
-              { id: 'dashboard', label: 'Tableau de bord' },
+              { id: 'services', label: `Prestations & Médias (${data.services.length})` },
+              { id: 'schedule', label: 'Calendrier & Horaires' },
               { id: 'bookings', label: `Rendez-vous (${data.bookings.length})` },
-              { id: 'schedule', label: 'Horaires & Supplément' },
+              { id: 'content', label: 'Contenus & Textes' },
               { id: 'emails', label: 'E-mails & Journal' },
-              { id: 'services', label: `Prestations (${data.services.length})` },
-              { id: 'content', label: 'Contenus & Protocoles' },
-              { id: 'cloudinary', label: 'Photos & Paramètres' },
+              { id: 'cloudinary', label: 'Paramètres Studio' },
+              { id: 'dashboard', label: 'Vue d’ensemble' },
             ] as { id: AdminTab; label: string }[]
           ).map((tab) => (
             <button
@@ -1282,27 +1342,19 @@ export const AdminPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Bouton de remplacement direct de la photo */}
+                    {/* Bouton vers l'édition complète avec recadrage */}
                     <div className="pt-2 border-t border-stone/40">
-                      <label className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 border border-charcoal bg-white px-3 py-1.5 text-xs font-medium text-charcoal hover:bg-ivory transition-colors">
-                        <Upload className="h-3.5 w-3.5" />
-                        <span>
-                          {uploadingServiceId === service.id
-                            ? 'Envoi en cours...'
-                            : 'Changer la photo ou vidéo'}
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
-                          disabled={uploadingServiceId === service.id}
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) handleServiceMediaUpload(service, f);
-                            e.target.value = '';
-                          }}
-                          className="hidden"
-                        />
-                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('services');
+                          openEditServiceModal(service);
+                        }}
+                        className="flex min-h-[38px] w-full items-center justify-center gap-2 border border-charcoal bg-white px-3 py-1.5 text-xs font-semibold text-charcoal hover:bg-ivory transition-colors cursor-pointer"
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                        <span>Modifier ce soin &amp; média</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2542,44 +2594,32 @@ export const AdminPage: React.FC = () => {
           </section>
         )}
 
-        {/* TAB 4: SERVICES & ADDONS */}
+        {/* TAB 4: SERVICES & ADDONS (YDM style direct editing + cropping modal) */}
         {activeTab === 'services' && (
-          <section className="space-y-8">
-            <div className="space-y-4">
+          <section className="space-y-8 animate-fade-in">
+            {/* Header minimaliste et boutons d'actions */}
+            <div className="flex flex-col gap-4 border border-stone bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-serif text-3xl text-charcoal">Prestations & Tarifs</h2>
-                <p className="text-xs text-taupe">
-                  Ajoutez, modifiez ou masquez vos prestations. Chaque soin dispose déjà d’une
-                  illustration assortie au style du site : vous pouvez l’afficher, la masquer en un
-                  clic ou la remplacer par votre propre photo.
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="font-serif text-3xl text-charcoal">Prestations &amp; Tarifs</h2>
+                  <span className="inline-flex items-center border border-charcoal/20 bg-ivory px-2.5 py-0.5 text-[10px] font-semibold tracking-wider text-charcoal uppercase">
+                    Durée uniforme : 2h par soin
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-taupe">
+                  Chaque prestation dispose d’une durée fixe de 2 heures. Modifiez vos prix, photos avec recadrage sur-mesure (16:10) et vidéos HD directement sur le soin.
                 </p>
               </div>
 
-              {/* Global show/hide illustrations control */}
-              <div className="flex flex-wrap items-center justify-between gap-4 border border-stone bg-white p-5 shadow-xs">
-                <div className="max-w-xl">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <h3 className="font-serif text-2xl text-charcoal">
-                      Illustrations sur la carte des tarifs
-                    </h3>
-                    <span
-                      className={`px-2.5 py-0.5 text-[10px] font-medium tracking-wider uppercase ${
-                        data.config.showServiceImages !== false
-                          ? 'bg-emerald-100 text-emerald-950'
-                          : 'bg-amber-100 text-amber-950'
-                      }`}
-                    >
-                      {data.config.showServiceImages !== false
-                        ? 'Affichées sur le site'
-                        : 'Toutes masquées'}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed text-taupe">
-                    Si vous préférez afficher uniquement du texte sur votre carte des tarifs,
-                    masquez toutes les illustrations d’un clic ici. Rien n’est supprimé : vous
-                    pouvez les réafficher à tout moment ou n’en masquer que certaines ci-dessous.
-                  </p>
-                </div>
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={openCreateServiceModal}
+                  className="inline-flex min-h-[44px] items-center gap-2 border border-charcoal bg-charcoal px-4 py-2 text-xs font-semibold tracking-wider text-ivory uppercase hover:bg-silk transition-colors cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Ajouter une prestation</span>
+                </button>
 
                 <button
                   type="button"
@@ -2592,28 +2632,24 @@ export const AdminPage: React.FC = () => {
                         : 'Toutes les illustrations sont maintenant masquées sur la carte publique.'
                     );
                   }}
-                  className={`inline-flex min-h-[46px] shrink-0 items-center gap-2 border px-4 py-2 text-xs font-medium tracking-wider uppercase transition-colors ${
-                    data.config.showServiceImages !== false
-                      ? 'border-charcoal bg-white text-charcoal hover:bg-ivory'
-                      : 'border-charcoal bg-charcoal text-ivory hover:bg-silk'
-                  }`}
+                  className="inline-flex min-h-[44px] items-center gap-2 border border-stone bg-white px-4 py-2 text-xs font-medium tracking-wider text-charcoal uppercase hover:border-charcoal transition-colors cursor-pointer"
                 >
                   {data.config.showServiceImages !== false ? (
                     <>
-                      <EyeOff className="h-4 w-4" aria-hidden="true" />
-                      <span>Tout masquer sur le site</span>
+                      <EyeOff className="h-4 w-4 text-taupe" />
+                      <span>Masquer visuels du site</span>
                     </>
                   ) : (
                     <>
-                      <Eye className="h-4 w-4" aria-hidden="true" />
-                      <span>Tout afficher sur le site</span>
+                      <Eye className="h-4 w-4 text-emerald-700" />
+                      <span>Afficher visuels du site</span>
                     </>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* Filtres par catégorie pour trouver immédiatement un soin */}
+            {/* Filtres par catégorie */}
             <div className="flex flex-wrap items-center gap-2">
               {[
                 { id: 'all', label: 'Toutes les prestations' },
@@ -2632,7 +2668,7 @@ export const AdminPage: React.FC = () => {
                     key={cat.id}
                     type="button"
                     onClick={() => setServiceCategoryFilter(cat.id)}
-                    className={`min-h-[38px] border px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
+                    className={`min-h-[38px] border px-4 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
                       active
                         ? 'border-charcoal bg-charcoal text-ivory font-semibold'
                         : 'border-stone bg-white text-charcoal hover:border-charcoal'
@@ -2644,436 +2680,532 @@ export const AdminPage: React.FC = () => {
               })}
             </div>
 
-            <div className="space-y-3">
+            {/* Grille responsive des Prestations */}
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {data.services
                 .filter((s) => serviceCategoryFilter === 'all' || s.category === serviceCategoryFilter)
                 .map((service) => {
-                  const serviceImageEnabled = service.showImage !== false;
-                  const globalImagesEnabled = data.config.showServiceImages !== false;
                   const isImageShownOnSite =
-                    globalImagesEnabled && serviceImageEnabled && Boolean(service.imageUrl);
-                  const isExpanded = expandedServiceIds.has(service.id);
+                    data.config.showServiceImages !== false &&
+                    service.showImage !== false &&
+                    Boolean(service.imageUrl);
 
                   return (
                     <div
                       key={service.id}
-                      className="border border-stone bg-white shadow-xs transition-all"
+                      className="group flex flex-col justify-between border border-stone bg-white shadow-xs hover:border-charcoal transition-all"
                     >
-                      {/* Entête pliée / dépliée de la prestation */}
-                      <div
-                        onClick={() => toggleServiceExpanded(service.id)}
-                        className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer hover:bg-ivory/50 transition-colors"
-                      >
-                        <div className="flex items-center gap-3.5">
+                      <div>
+                        {/* Aperçu du média (Photo ou Vidéo) */}
+                        <div className="relative aspect-[16/10] w-full overflow-hidden bg-obsidian border-b border-stone/50">
                           {service.imageUrl ? (
-                            <img
-                              src={optimizeCloudinaryUrl(service.imageUrl, 100)}
-                              alt=""
-                              className={`h-12 w-12 border border-charcoal/15 object-cover shrink-0 ${
-                                isImageShownOnSite ? '' : 'opacity-40 grayscale'
-                              }`}
+                            <AestheticMediaViewer
+                              url={service.imageUrl}
+                              alt={service.name}
+                              badge={service.category}
+                              aspectRatioClass="aspect-[16/10]"
+                              allowExpand={true}
+                              className={isImageShownOnSite ? '' : 'opacity-50 grayscale'}
                             />
                           ) : (
-                            <div className="h-12 w-12 border border-stone/70 bg-ivory flex items-center justify-center text-[9px] text-taupe uppercase shrink-0">
-                              Sans image
+                            <div className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-ivory text-taupe">
+                              <Sparkles className="h-6 w-6 opacity-30 mb-1" />
+                              <span className="text-[10px] uppercase tracking-wider">
+                                Aucun visuel défini
+                              </span>
                             </div>
                           )}
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h4 className="font-serif text-lg font-medium text-charcoal">
-                                {service.name}
-                              </h4>
-                              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 border border-stone/60 bg-paper text-taupe">
+
+                          {/* Statut Visuel actif/masqué */}
+                          <div className="absolute top-2 right-2 z-20">
+                            {isImageShownOnSite ? (
+                              <span className="bg-emerald-950/85 backdrop-blur-xs text-emerald-200 border border-emerald-400/30 text-[9px] font-semibold px-2 py-0.5 uppercase tracking-wider">
+                                Visible
+                              </span>
+                            ) : (
+                              <span className="bg-stone-900/85 backdrop-blur-xs text-stone-300 border border-white/20 text-[9px] font-semibold px-2 py-0.5 uppercase tracking-wider">
+                                Masqué
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Contenu de la fiche */}
+                        <div className="p-5 space-y-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className="text-[10px] font-medium uppercase tracking-wider text-taupe">
                                 {service.category}
                               </span>
-                              {service.active ? (
-                                <span className="text-[10px] text-emerald-800 font-medium bg-emerald-50 px-2 py-0.5 border border-emerald-200">
-                                  Actif sur le site
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-stone-600 bg-stone/20 px-2 py-0.5">
-                                  Masqué
+                              <h3 className="font-serif text-lg font-medium text-charcoal leading-snug">
+                                {service.name}
+                              </h3>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-serif text-xl font-medium text-charcoal">
+                                {service.fullPrice} €
+                              </span>
+                              {service.refillPrice != null && (
+                                <span className="block text-[10px] text-taupe">
+                                  Rempl. {service.refillPrice} €
                                 </span>
                               )}
                             </div>
-                            <p className="mt-0.5 text-xs text-taupe">
-                              Tarif : <strong className="text-charcoal">{service.fullPrice} €</strong>
-                              {service.refillPrice != null ? ` · Remplissage : ${service.refillPrice} €` : ''} · Durée : {service.durationMinutes} min
-                            </p>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleServiceExpanded(service.id);
-                            }}
-                            className="inline-flex min-h-[36px] items-center gap-1.5 border border-stone bg-white px-3 py-1 text-xs text-charcoal hover:border-charcoal transition-colors cursor-pointer"
-                          >
-                            <span>{isExpanded ? 'Fermer' : 'Modifier'}</span>
-                            <ChevronDown
-                              className={`h-3.5 w-3.5 transition-transform duration-200 ${
-                                isExpanded ? 'rotate-180' : ''
-                              }`}
-                            />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center border border-charcoal/10 bg-ivory px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
+                              Durée : 2h
+                            </span>
+                            {service.active ? (
+                              <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-200 font-medium">
+                                En ligne
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-stone-600 bg-stone/20 px-2 py-0.5">
+                                Désactivé
+                              </span>
+                            )}
+                          </div>
+
+                          {service.description && (
+                            <p className="text-xs text-taupe line-clamp-2 leading-relaxed">
+                              {service.description}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      {/* Formulaire complet affiché au clic */}
-                      {isExpanded && (
-                        <div className="border-t border-stone/60 p-5 bg-paper/30 sm:p-6">
-                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">Nom</label>
-                              <input
-                                type="text"
-                                value={service.name}
-                                onChange={(e) => upsertService({ ...service, name: e.target.value })}
-                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                              />
-                            </div>
+                      {/* Barre d'action rapide sous chaque carte */}
+                      <div className="border-t border-stone/60 p-3 bg-ivory/30 flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEditServiceModal(service)}
+                          className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 border border-charcoal bg-white px-3 py-1.5 text-xs font-semibold text-charcoal uppercase tracking-wider hover:bg-charcoal hover:text-ivory transition-colors cursor-pointer"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                          <span>Modifier</span>
+                        </button>
 
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">Catégorie</label>
-                              <select
-                                value={service.category}
-                                onChange={(e) =>
-                                  upsertService({
-                                    ...service,
-                                    category: e.target.value as ServiceCategory,
-                                  })
-                                }
-                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                              >
-                                {CATEGORY_OPTIONS.map((opt) => (
-                                  <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextActive = !service.active;
+                            upsertService({ ...service, active: nextActive });
+                            notify(
+                              nextActive
+                                ? `Prestation « ${service.name} » activée.`
+                                : `Prestation « ${service.name} » masquée.`
+                            );
+                          }}
+                          title={service.active ? 'Masquer du site' : 'Activer sur le site'}
+                          className={`min-h-[38px] min-w-[38px] inline-flex items-center justify-center border transition-colors cursor-pointer ${
+                            service.active
+                              ? 'border-stone text-charcoal hover:border-charcoal bg-white'
+                              : 'border-stone bg-stone/20 text-stone-500'
+                          }`}
+                        >
+                          {service.active ? (
+                            <Eye className="h-4 w-4" />
+                          ) : (
+                            <EyeOff className="h-4 w-4" />
+                          )}
+                        </button>
 
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">
-                                Tarif principal (€)
-                              </label>
-                              <input
-                                type="number"
-                                value={service.fullPrice}
-                                onChange={(e) =>
-                                  upsertService({ ...service, fullPrice: Number(e.target.value) || 0 })
-                                }
-                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">
-                                Remplissage / Option (€)
-                              </label>
-                              <input
-                                type="number"
-                                value={service.refillPrice ?? ''}
-                                placeholder="Aucun"
-                                onChange={(e) =>
-                                  upsertService({
-                                    ...service,
-                                    refillPrice: e.target.value === '' ? null : Number(e.target.value),
-                                  })
-                                }
-                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">Description</label>
-                              <textarea
-                                rows={2}
-                                value={service.description}
-                                onChange={(e) =>
-                                  upsertService({ ...service, description: e.target.value })
-                                }
-                                className="mt-1 w-full border border-stone bg-white px-3 py-2 text-sm"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[11px] text-taupe uppercase">
-                                Illustration ou vidéo du soin
-                              </label>
-                              <div className="mt-1 flex items-start gap-3">
-                                <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden border border-stone bg-paper">
-                                  {service.imageUrl ? (
-                                    <AestheticMediaViewer
-                                      url={service.imageUrl}
-                                      alt={service.name}
-                                      aspectRatioClass="h-full w-full"
-                                      showControls={false}
-                                      allowExpand={true}
-                                    />
-                                  ) : (
-                                    <span className="px-1 text-center text-[10px] leading-tight text-taupe uppercase">
-                                      Sans visuel
-                                    </span>
-                                  )}
-                                </div>
-
-                                <div className="min-w-0 flex-1 space-y-2">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <label className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1 text-xs font-medium text-ivory hover:bg-silk transition-colors">
-                                      <Upload className="h-3.5 w-3.5" />
-                                      <span>
-                                        {uploadingServiceId === service.id
-                                          ? 'Téléversement...'
-                                          : 'Téléverser photo ou vidéo'}
-                                      </span>
-                                      <input
-                                        type="file"
-                                        accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
-                                        disabled={uploadingServiceId === service.id}
-                                        onChange={(e) => {
-                                          const f = e.target.files?.[0];
-                                          if (f) handleServiceMediaUpload(service, f);
-                                          e.target.value = '';
-                                        }}
-                                        className="hidden"
-                                      />
-                                    </label>
-
-                                    {isVideoUrl(service.imageUrl) && (
-                                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-1 border border-emerald-200">
-                                        <Video className="h-3 w-3" />
-                                        <span>Format Vidéo actif</span>
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  <input
-                                    type="text"
-                                    value={service.imageUrl || ''}
-                                    placeholder="Ex. Lien Cloudinary (image ou vidéo)"
-                                    onChange={(e) =>
-                                      upsertService({ ...service, imageUrl: e.target.value })
-                                    }
-                                    className="min-h-[40px] w-full border border-stone bg-white px-3 py-1.5 text-xs"
-                                  />
-                                  {data.media.length > 0 && (
-                                    <select
-                                      aria-label="Choisir une illustration ou photo enregistrée"
-                                      value=""
-                                      onChange={(e) => {
-                                        if (e.target.value) {
-                                          upsertService({
-                                            ...service,
-                                            imageUrl: e.target.value,
-                                            showImage: true,
-                                          });
-                                          notify('Média attribué à la prestation.');
-                                        }
-                                      }}
-                                      className="min-h-[36px] w-full border border-stone/70 bg-ivory px-2.5 text-xs"
-                                    >
-                                      <option value="">Choisir dans la bibliothèque média...</option>
-                                      {data.media.map((m) => (
-                                        <option key={m.id} value={m.url}>
-                                          {m.label} {isVideoUrl(m.url) ? '(Vidéo)' : ''}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone/60 pt-3">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={service.active}
-                                  onChange={(e) =>
-                                    upsertService({ ...service, active: e.target.checked })
-                                  }
-                                  className="h-4 w-4 accent-charcoal"
-                                />
-                                <span>Prestation visible sur le site</span>
-                              </label>
-
-                              <label
-                                className={`inline-flex min-h-[40px] cursor-pointer items-center gap-2 border px-3 py-1.5 text-xs transition-colors ${
-                                  !service.imageUrl
-                                    ? 'border-stone/50 bg-ivory/60 text-taupe'
-                                    : serviceImageEnabled && globalImagesEnabled
-                                      ? 'border-stone bg-paper text-charcoal hover:border-charcoal'
-                                      : 'border-amber-300 bg-amber-50 text-amber-950'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={serviceImageEnabled}
-                                  onChange={(e) => {
-                                    const nextChecked = e.target.checked;
-                                    upsertService({ ...service, showImage: nextChecked });
-                                    notify(
-                                      nextChecked
-                                        ? `Illustration affichée pour « ${service.name} ».`
-                                        : `Illustration masquée pour « ${service.name} ».`
-                                    );
-                                  }}
-                                  className="h-4 w-4 accent-charcoal"
-                                />
-                                {serviceImageEnabled && globalImagesEnabled ? (
-                                  <Eye className="h-3.5 w-3.5 text-charcoal" aria-hidden="true" />
-                                ) : (
-                                  <EyeOff className="h-3.5 w-3.5 text-taupe" aria-hidden="true" />
-                                )}
-                                <span>
-                                  {!service.imageUrl
-                                    ? 'Pas d’image choisie'
-                                    : !serviceImageEnabled
-                                      ? 'Illustration masquée sur le site'
-                                      : !globalImagesEnabled
-                                        ? 'Afficher l’illustration (masquage global actif)'
-                                        : 'Afficher l’illustration'}
-                                </span>
-                              </label>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                deleteService(service.id);
-                                notify('Prestation supprimée.');
-                              }}
-                              className="inline-flex min-h-[40px] items-center gap-1.5 border border-red-200 px-3 py-1.5 text-xs text-red-800 hover:bg-red-50 cursor-pointer"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                              <span>Supprimer</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer définitivement « ${service.name} » ?`)) {
+                              deleteService(service.id);
+                              notify('Prestation supprimée du catalogue.');
+                            }
+                          }}
+                          title="Supprimer la prestation"
+                          className="min-h-[38px] min-w-[38px] inline-flex items-center justify-center border border-red-200 bg-white text-red-700 hover:bg-red-50 hover:border-red-400 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
             </div>
 
-            <form onSubmit={handleAddService} className="border border-charcoal bg-white p-6">
-              <h3 className="font-serif text-2xl text-charcoal">Ajouter une prestation</h3>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Nom *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newService.name}
-                    onChange={(e) => setNewService({ ...newService, name: e.target.value })}
-                    placeholder="Ex. Pose Fox Eyes"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Catégorie</label>
-                  <select
-                    value={newService.category}
-                    onChange={(e) =>
-                      setNewService({
-                        ...newService,
-                        category: e.target.value as ServiceCategory,
-                      })
-                    }
-                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                  >
-                    {CATEGORY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Prix (€) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={newService.fullPrice}
-                    onChange={(e) =>
-                      setNewService({ ...newService, fullPrice: Number(e.target.value) || 0 })
-                    }
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">
-                    Remplissage (€, optionnel)
-                  </label>
-                  <input
-                    type="number"
-                    value={newService.refillPrice ?? ''}
-                    onChange={(e) =>
-                      setNewService({
-                        ...newService,
-                        refillPrice: e.target.value === '' ? null : Number(e.target.value),
-                      })
-                    }
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Description</label>
-                  <input
-                    type="text"
-                    value={newService.description}
-                    onChange={(e) => setNewService({ ...newService, description: e.target.value })}
-                    placeholder="Description courte affichée sur la carte des tarifs"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">
-                    Illustration ou photo (facultatif)
-                  </label>
-                  <select
-                    value={newService.imageUrl || ''}
-                    onChange={(e) =>
-                      setNewService({
-                        ...newService,
-                        imageUrl: e.target.value,
-                        showImage: true,
-                      })
-                    }
-                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                  >
-                    <option value="">Aucune image (texte uniquement)</option>
-                    {data.media.map((m) => (
-                      <option key={m.id} value={m.url}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="mt-4 inline-flex min-h-[46px] items-center gap-2 border border-charcoal bg-charcoal px-5 py-2 text-xs font-medium tracking-wider text-ivory uppercase hover:bg-silk"
+            {/* MODAL DE MODIFICATION DU SOIN & VISUEL (Style YDM Coiffure) */}
+            {isServiceModalOpen && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                className="fixed inset-0 z-50 flex items-center justify-center bg-obsidian/85 p-3 sm:p-6 backdrop-blur-md overflow-y-auto animate-fade-in"
               >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                <span>Ajouter cette prestation</span>
-              </button>
-            </form>
+                <div className="relative my-8 w-full max-w-2xl border border-stone bg-white p-6 sm:p-8 text-charcoal shadow-2xl max-h-[92vh] overflow-y-auto">
+                  {/* Entête du modal */}
+                  <div className="flex items-center justify-between border-b border-stone/60 pb-4">
+                    <div>
+                      <span className="text-[10px] font-semibold tracking-widest text-taupe uppercase">
+                        Gestion de la prestation
+                      </span>
+                      <h3 className="font-serif text-2xl text-charcoal font-medium">
+                        {isCreatingService
+                          ? 'Ajouter une nouvelle prestation'
+                          : `Modifier : ${serviceForm.name || 'Prestation'}`}
+                      </h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsServiceModalOpen(false)}
+                      aria-label="Fermer"
+                      className="flex h-9 w-9 items-center justify-center border border-stone hover:border-charcoal transition-colors cursor-pointer"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
 
+                  <form onSubmit={handleSaveServiceModal} className="mt-6 space-y-6">
+                    {/* SECTION 1: VISUEL (PHOTO OU VIDÉO DIRECTE) */}
+                    <div className="border border-stone bg-paper/40 p-5 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <h4 className="font-serif text-lg font-medium text-charcoal">
+                            Photo ou Vidéo du soin
+                          </h4>
+                          <p className="text-xs text-taupe">
+                            Cadrage 16:10 garanti. Recadrez la photo à votre guise ou liez une vidéo HD.
+                          </p>
+                        </div>
+
+                        {serviceForm.imageUrl && isVideoUrl(serviceForm.imageUrl) && (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 font-medium">
+                            <Film className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Format Vidéo HD</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Aperçu direct en 16:10 */}
+                      <div className="relative aspect-[16/10] w-full overflow-hidden border border-stone bg-obsidian">
+                        {serviceForm.imageUrl ? (
+                          <AestheticMediaViewer
+                            url={serviceForm.imageUrl}
+                            alt={serviceForm.name}
+                            aspectRatioClass="aspect-[16/10]"
+                            allowExpand={true}
+                          />
+                        ) : (
+                          <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center text-taupe bg-ivory">
+                            <Sparkles className="h-8 w-8 opacity-30 mb-2" />
+                            <span className="text-xs uppercase tracking-wider font-medium">
+                              Aucun visuel associé
+                            </span>
+                            <span className="text-[11px] text-taupe/80 mt-1">
+                              Importez une photo ou vidéo ci-dessous
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Barre de progression réelle lors de l'envoi vers Cloudinary */}
+                      {uploadingMedia && (
+                        <div className="space-y-1.5 border border-amber-300 bg-amber-50 p-3.5">
+                          <div className="flex items-center justify-between text-xs font-semibold text-amber-900">
+                            <span className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
+                              <span>Envoi vers Cloudinary en cours...</span>
+                            </span>
+                            <span>{uploadProgress}%</span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden bg-amber-200 rounded-full">
+                            <div
+                              className="h-full bg-amber-600 transition-all duration-150"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Inputs cachés déclenchés par les boutons clairs */}
+                      <input
+                        ref={imageFileInputRef}
+                        type="file"
+                        accept="image/*,.heic,.jpg,.jpeg,.png,.webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSelectImageForCrop(file);
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+
+                      <input
+                        ref={videoFileInputRef}
+                        type="file"
+                        accept="video/*,.mp4,.mov,.webm,.m4v"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSelectVideoUpload(file);
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+
+                      {/* Boutons d'action directs et compréhensibles */}
+                      <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          disabled={uploadingMedia}
+                          onClick={() => imageFileInputRef.current?.click()}
+                          className="min-h-[44px] inline-flex items-center gap-2 border border-charcoal bg-charcoal px-4 py-2 text-xs font-semibold tracking-wider text-ivory uppercase hover:bg-silk transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <Upload className="h-4 w-4" />
+                          <span>Changer la photo (avec recadrage)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={uploadingMedia}
+                          onClick={() => videoFileInputRef.current?.click()}
+                          className="min-h-[44px] inline-flex items-center gap-2 border border-stone bg-white px-4 py-2 text-xs font-semibold tracking-wider text-charcoal uppercase hover:border-charcoal transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <Video className="h-4 w-4" />
+                          <span>Remplacer par une vidéo</span>
+                        </button>
+
+                        {serviceForm.imageUrl && !isVideoUrl(serviceForm.imageUrl) && (
+                          <button
+                            type="button"
+                            onClick={handleRecropExistingImage}
+                            className="min-h-[44px] inline-flex items-center gap-1.5 border border-stone bg-white px-3 py-2 text-xs font-medium text-charcoal hover:border-charcoal transition-colors cursor-pointer"
+                          >
+                            <Crop className="h-3.5 w-3.5" />
+                            <span>Ajuster le cadrage</span>
+                          </button>
+                        )}
+
+                        {serviceForm.imageUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setServiceForm((prev) => ({
+                                ...prev,
+                                imageUrl: '',
+                              }))
+                            }
+                            className="min-h-[44px] text-xs text-red-700 hover:underline px-3 py-2 cursor-pointer ml-auto"
+                          >
+                            Retirer le visuel
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lien discret pour les options avancées d'URL */}
+                      <div className="pt-2 border-t border-stone/50">
+                        <button
+                          type="button"
+                          onClick={() => setShowManualUrl(!showManualUrl)}
+                          className="text-[11px] text-taupe hover:text-charcoal underline cursor-pointer"
+                        >
+                          {showManualUrl
+                            ? 'Masquer le lien URL direct'
+                            : 'Options avancées : voir ou modifier le lien direct'}
+                        </button>
+
+                        {showManualUrl && (
+                          <div className="mt-2.5">
+                            <input
+                              type="text"
+                              value={serviceForm.imageUrl}
+                              onChange={(e) =>
+                                setServiceForm((prev) => ({ ...prev, imageUrl: e.target.value }))
+                              }
+                              placeholder="https://res.cloudinary.com/..."
+                              className="min-h-[40px] w-full border border-stone bg-white px-3 text-xs font-mono"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: INFORMATIONS DE LA PRESTATION */}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                          Nom de la prestation *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={serviceForm.name}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({ ...prev, name: e.target.value }))
+                          }
+                          placeholder="Ex. Pose mixte (cil à cil + 4D)"
+                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                          Catégorie *
+                        </label>
+                        <select
+                          value={serviceForm.category}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({
+                              ...prev,
+                              category: e.target.value as ServiceCategory,
+                            }))
+                          }
+                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
+                        >
+                          {CATEGORY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                          Tarif principal (€) *
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={serviceForm.fullPrice}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({
+                              ...prev,
+                              fullPrice: Number(e.target.value) || 0,
+                            }))
+                          }
+                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                          Remplissage / Option (€, laisser vide si aucun)
+                        </label>
+                        <input
+                          type="number"
+                          value={serviceForm.refillPrice ?? ''}
+                          placeholder="Aucun remplissage"
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({
+                              ...prev,
+                              refillPrice: e.target.value === '' ? null : Number(e.target.value),
+                            }))
+                          }
+                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Durée uniforme de 2h */}
+                    <div className="border border-stone/60 bg-ivory/50 p-3.5 flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-charcoal uppercase tracking-wider">
+                          Durée de la prestation
+                        </span>
+                        <p className="text-[11px] text-taupe">
+                          Conformément aux règles du studio, tous les soins durent 2 heures pour le créneau client.
+                        </p>
+                      </div>
+                      <span className="border border-charcoal bg-charcoal text-ivory px-3 py-1 text-xs font-bold tracking-widest uppercase">
+                        2 heures (120 min)
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                        Description du soin
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={serviceForm.description}
+                        onChange={(e) =>
+                          setServiceForm((prev) => ({ ...prev, description: e.target.value }))
+                        }
+                        placeholder="Description courte affichée aux clientes lors de la sélection..."
+                        className="mt-1 w-full border border-stone bg-white p-3 text-sm leading-relaxed"
+                      />
+                    </div>
+
+                    {/* SECTION 3: VISIBILITÉ & ACTIVATION */}
+                    <div className="border-t border-stone/60 pt-4 flex flex-wrap gap-4">
+                      <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2.5 text-xs text-charcoal">
+                        <input
+                          type="checkbox"
+                          checked={serviceForm.active}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({ ...prev, active: e.target.checked }))
+                          }
+                          className="h-4 w-4 accent-charcoal"
+                        />
+                        <span>Prestation active et réservable sur le site</span>
+                      </label>
+
+                      <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2.5 text-xs text-charcoal">
+                        <input
+                          type="checkbox"
+                          checked={serviceForm.showImage}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({ ...prev, showImage: e.target.checked }))
+                          }
+                          className="h-4 w-4 accent-charcoal"
+                        />
+                        <span>Afficher le visuel (photo ou vidéo) sur la carte publique</span>
+                      </label>
+                    </div>
+
+                    {/* PIED DE MODAL AVEC SAUVEGARDE EXPLICITE */}
+                    <div className="border-t border-stone pt-5 flex flex-wrap items-center justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsServiceModalOpen(false)}
+                        disabled={savingService}
+                        className="min-h-[44px] border border-stone px-5 py-2 text-xs uppercase tracking-wider text-taupe hover:border-charcoal hover:text-charcoal transition-colors cursor-pointer"
+                      >
+                        Annuler
+                      </button>
+
+                      <button
+                        type="submit"
+                        disabled={savingService || uploadingMedia}
+                        className="min-h-[44px] inline-flex items-center gap-2 border border-charcoal bg-charcoal px-7 py-2.5 text-xs font-semibold tracking-widest text-ivory uppercase hover:bg-silk transition-colors disabled:opacity-60 cursor-pointer shadow-md"
+                      >
+                        {savingService ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Enregistrement en direct...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4" />
+                            <span>Enregistrer les modifications</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* MODAL INTERACTIF DE RECADRAGE DE PHOTO 16:10 */}
+            <ImageCropModal
+              isOpen={cropModalOpen}
+              imageSrc={cropImageSrc}
+              fileName={cropFileName}
+              onClose={() => setCropModalOpen(false)}
+              onCropComplete={handleCropComplete}
+              aspectRatio={16 / 10}
+            />
+
+            {/* SECTION ADDONS / OPTIONS */}
             <div className="border border-stone bg-white p-6">
-              <h3 className="font-serif text-2xl text-charcoal">Options & Suppléments</h3>
+              <h3 className="font-serif text-2xl text-charcoal">Options &amp; Suppléments</h3>
               <ul className="mt-4 divide-y divide-stone/60">
                 {data.addons.map((addon) => (
                   <li key={addon.id} className="flex flex-wrap items-center justify-between gap-4 py-3">
@@ -3534,235 +3666,121 @@ export const AdminPage: React.FC = () => {
           </section>
         )}
 
-        {/* TAB 6: PHOTOS & SETTINGS */}
+        {/* TAB 6: PARAMÈTRES STUDIO (Cloudinary, Sécurité, Sauvegarde) */}
         {activeTab === 'cloudinary' && (
-          <section className="space-y-8">
-            <div className="space-y-4 border border-stone bg-white p-6">
-              <h2 className="font-serif text-3xl text-charcoal">
-                Illustrations & Photos du studio
-              </h2>
-              <p className="text-xs leading-relaxed text-taupe">
-                Vos illustrations par défaut sont prêtes ci-dessous et visibles dans l’onglet{' '}
-                <strong>Prestations</strong>. Pour ajouter vos propres photos depuis votre
-                téléphone ou ordinateur, configurez Cloudinary (facultatif) ou collez simplement le
-                lien d’une photo.
+          <section className="space-y-8 animate-fade-in">
+            {/* Header */}
+            <div className="border border-stone bg-white p-6">
+              <h2 className="font-serif text-3xl text-charcoal">Paramètres &amp; Sécurité</h2>
+              <p className="mt-1 text-xs text-taupe leading-relaxed">
+                État de la connexion Cloudinary pour les photos/vidéos, gestion des accès et sauvegarde complète du studio.
+              </p>
+            </div>
+
+            {/* État de connexion Cloudinary */}
+            <div className="border border-stone bg-white p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+                  <h3 className="font-serif text-xl font-medium text-charcoal">
+                    Stockage Médias Cloudinary · Opérationnel
+                  </h3>
+                </div>
+                <span className="border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 uppercase tracking-wider">
+                  Connecté &amp; Prêt
+                </span>
+              </div>
+
+              <p className="text-xs text-taupe leading-relaxed">
+                Les téléversements et le recadrage 16:10 de vos photos et vidéos se font directement depuis l’onglet <strong>Prestations &amp; Médias</strong> sur chaque soin. Vos visuels sont hébergés et diffusés en haute définition sans ralentir le site.
               </p>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Cloud Name</label>
-                  <input
-                    type="text"
-                    value={data.config.cloudinary.cloudName}
-                    onChange={(e) =>
-                      updateConfig({
-                        cloudinary: { ...data.config.cloudinary, cloudName: e.target.value },
-                      })
-                    }
-                    placeholder="ex: alshanas-glow"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="border border-stone/70 bg-ivory/50 p-3">
+                  <span className="text-[10px] text-taupe uppercase tracking-wider block">Cloud Name</span>
+                  <span className="font-mono text-xs font-semibold text-charcoal">
+                    {data.config.cloudinary.cloudName || 'dvecpg1tz'}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">
-                    Upload Preset (unsigned)
-                  </label>
-                  <input
-                    type="text"
-                    value={data.config.cloudinary.uploadPreset}
-                    onChange={(e) =>
-                      updateConfig({
-                        cloudinary: { ...data.config.cloudinary, uploadPreset: e.target.value },
-                      })
-                    }
-                    placeholder="ex: studio_unsigned"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
+                <div className="border border-stone/70 bg-ivory/50 p-3">
+                  <span className="text-[10px] text-taupe uppercase tracking-wider block">Upload Preset (Direct)</span>
+                  <span className="font-mono text-xs font-semibold text-charcoal">
+                    {data.config.cloudinary.uploadPreset || 'alshanas_unsigned'}
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-[11px] text-taupe uppercase">Dossier cible</label>
-                  <input
-                    type="text"
-                    value={data.config.cloudinary.folder}
-                    onChange={(e) =>
-                      updateConfig({
-                        cloudinary: { ...data.config.cloudinary, folder: e.target.value },
-                      })
-                    }
-                    placeholder="alshanas-glow"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="border border-charcoal/15 bg-paper p-4 text-xs leading-relaxed text-charcoal">
-                <p className="font-semibold uppercase tracking-wider text-[11px] text-charcoal">
-                  Configuration Cloudinary (Gratuite &amp; Illimitée — Photos &amp; Vidéos)
-                </p>
-                <p className="mt-1 text-taupe">
-                  Pour activer les téléversements directs de photos et vidéos (formats verticaux reels ou horizontaux) depuis votre téléphone ou ordinateur :
-                </p>
-                <ol className="mt-2 list-decimal list-inside space-y-1 text-taupe">
-                  <li>Créez un compte gratuit sur <strong>cloudinary.com</strong>.</li>
-                  <li>Dans vos paramètres Cloudinary (<strong>Settings &gt; Upload presets</strong>), créez un preset configuré en mode <strong>Unsigned</strong>.</li>
-                  <li>Saisissez votre <strong>Cloud Name</strong> et votre <strong>Upload Preset</strong> ci-dessus (ou ajoutez-les dans les variables d'environnement Vercel : <code className="bg-stone/30 px-1 py-0.5 rounded">CLOUDINARY_CLOUD_NAME</code> et <code className="bg-stone/30 px-1 py-0.5 rounded">CLOUDINARY_UPLOAD_PRESET</code>).</li>
-                </ol>
-              </div>
-
-              <div className="border-t border-stone/70 pt-5">
-                <h3 className="font-serif text-2xl text-charcoal">
-                  Envoyer ou ajouter un média (Photo ou Vidéo)
-                </h3>
-
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div className="border border-dashed border-charcoal/40 bg-ivory/70 p-4">
-                    <label className="flex cursor-pointer flex-col items-center justify-center gap-2 py-4 text-center">
-                      <Upload className="h-5 w-5 text-charcoal" aria-hidden="true" />
-                      <span className="text-xs font-medium tracking-wider text-charcoal uppercase">
-                        {uploading ? 'Envoi vers Cloudinary...' : 'Importer photo ou vidéo'}
-                      </span>
-                      <span className="text-[11px] text-taupe">
-                        Photos (JPG, PNG, WebP) &amp; Vidéos (MP4, MOV, WebM vertical/horizontal)
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
-                        disabled={uploading}
-                        onChange={handleCloudinaryUpload}
-                        className="visually-hidden"
-                      />
-                    </label>
-                    {uploadError && <p className="mt-2 text-xs text-red-800">{uploadError}</p>}
-                  </div>
-
-                  <form onSubmit={handleAddManualMedia} className="space-y-3 border border-stone p-4">
-                    <p className="text-xs font-medium tracking-wider text-charcoal uppercase">
-                      Ou ajouter une URL existante
-                    </p>
-                    <input
-                      type="text"
-                      placeholder="Nom (ex. Cil à cil vignette)"
-                      value={manualMediaLabel}
-                      onChange={(e) => setManualMediaLabel(e.target.value)}
-                      className="min-h-[42px] w-full border border-stone px-3 text-sm"
-                    />
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ex. /srv-cil-a-cil.jpg ou https://..."
-                      value={manualMediaUrl}
-                      onChange={(e) => setManualMediaUrl(e.target.value)}
-                      className="min-h-[42px] w-full border border-stone px-3 text-sm"
-                    />
-                    <div className="flex gap-2">
-                      <select
-                        value={manualMediaCat}
-                        onChange={(e) =>
-                          setManualMediaCat(e.target.value as ServiceCategory | 'editorial')
-                        }
-                        className="min-h-[42px] flex-1 border border-stone bg-white px-2 text-xs"
-                      >
-                        <option value="extensions">Extensions</option>
-                        <option value="depose">Dépose</option>
-                        <option value="rehaussement">Rehaussement</option>
-                        <option value="blanchiment">Blanchiment</option>
-                        <option value="editorial">Éditorial</option>
-                      </select>
-                      <button
-                        type="submit"
-                        className="min-h-[42px] border border-charcoal bg-charcoal px-4 text-xs font-medium text-ivory uppercase"
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                  </form>
-                </div>
-
-                <div className="mt-6">
-                  <h4 className="text-xs font-medium tracking-wider text-taupe uppercase">
-                    Bibliothèque ({data.media.length})
-                  </h4>
-                  {data.media.length === 0 ? (
-                    <p className="mt-2 text-xs text-taupe">
-                      Aucun média enregistré pour le moment.
-                    </p>
-                  ) : (
-                    <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                      {data.media.map((asset) => (
-                        <div key={asset.id} className="border border-stone bg-ivory p-2.5">
-                          <img
-                            src={optimizeCloudinaryUrl(asset.url, 320)}
-                            alt={asset.label}
-                            className="aspect-square w-full border border-stone/60 bg-paper object-cover"
-                          />
-                          <p className="mt-2 truncate text-xs font-medium text-charcoal">
-                            {asset.label}
-                          </p>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(asset.url).catch(() => {});
-                                notify('URL copiée.');
-                              }}
-                              className="inline-flex items-center gap-1 text-[11px] text-charcoal underline"
-                            >
-                              <ImageIcon className="h-3 w-3" aria-hidden="true" />
-                              <span>Copier URL</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteMediaAsset(asset.id)}
-                              className="text-[11px] text-red-800 hover:underline"
-                            >
-                              Supprimer
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="border border-stone/70 bg-ivory/50 p-3">
+                  <span className="text-[10px] text-taupe uppercase tracking-wider block">Dossier Studio</span>
+                  <span className="font-mono text-xs font-semibold text-charcoal">
+                    {data.config.cloudinary.folder || 'alshanas-glow'}
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4 border border-stone bg-white p-6">
-              <h3 className="font-serif text-2xl text-charcoal">Sécurité & Sauvegarde</h3>
-              <div className="max-w-sm">
-                <label className="block text-[11px] text-taupe uppercase">
-                  Code d’accès administrateur
-                </label>
-                <div className="mt-1 flex gap-2">
+            {/* Sécurité & Accès */}
+            <div className="border border-stone bg-white p-6 space-y-4">
+              <h3 className="font-serif text-2xl text-charcoal">Sécurité &amp; Accès Administrateur</h3>
+              <p className="text-xs text-taupe">
+                Définissez votre e-mail pour recevoir les alertes de réservation et le code secret d’accès à cette administration.
+              </p>
+
+              <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-charcoal font-medium">
+                    E-mail du studio (Alertes &amp; notifications)
+                  </label>
                   <input
-                    type="text"
-                    value={data.config.adminPasscode}
-                    onChange={(e) => updateConfig({ adminPasscode: e.target.value })}
-                    className="min-h-[44px] flex-1 border border-stone px-3 text-sm"
+                    type="email"
+                    value={data.config.contactEmail}
+                    onChange={(e) => updateConfig({ contactEmail: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
                   />
-                  <button
-                    type="button"
-                    onClick={() => notify('Code mis à jour.')}
-                    className="inline-flex min-h-[44px] items-center gap-1.5 border border-charcoal px-4 text-xs uppercase"
-                  >
-                    <Save className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>OK</span>
-                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase tracking-wider text-charcoal font-medium">
+                    Code secret administrateur
+                  </label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      type="text"
+                      value={data.config.adminPasscode}
+                      onChange={(e) => updateConfig({ adminPasscode: e.target.value })}
+                      className="min-h-[44px] flex-1 border border-stone bg-white px-3 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => notify('Code secret d’administration mis à jour.')}
+                      className="inline-flex min-h-[44px] items-center gap-1.5 border border-charcoal bg-charcoal px-4 text-xs font-semibold text-ivory uppercase hover:bg-silk transition-colors cursor-pointer"
+                    >
+                      <Save className="h-3.5 w-3.5" />
+                      <span>OK</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="flex flex-wrap gap-3 border-t border-stone/60 pt-4">
+            {/* Sauvegarde & Restauration */}
+            <div className="border border-stone bg-white p-6 space-y-4">
+              <h3 className="font-serif text-2xl text-charcoal">Sauvegarde &amp; Données</h3>
+              <p className="text-xs text-taupe">
+                Exportez l’ensemble de vos prestations, tarifs, réservations et règles dans un fichier sécurisé sur votre appareil.
+              </p>
+
+              <div className="flex flex-wrap gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleExportJson}
-                  className="inline-flex min-h-[44px] items-center gap-2 border border-charcoal px-4 py-2 text-xs font-medium uppercase hover:bg-ivory"
+                  className="inline-flex min-h-[44px] items-center gap-2 border border-charcoal bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wider text-charcoal hover:bg-ivory transition-colors cursor-pointer"
                 >
-                  <Download className="h-4 w-4" aria-hidden="true" />
+                  <Download className="h-4 w-4" />
                   <span>Exporter les données (JSON)</span>
                 </button>
 
-                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 border border-stone px-4 py-2 text-xs font-medium uppercase hover:border-charcoal">
-                  <Upload className="h-4 w-4" aria-hidden="true" />
-                  <span>Importer (JSON)</span>
+                <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 border border-stone bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wider text-charcoal hover:border-charcoal transition-colors">
+                  <Upload className="h-4 w-4" />
+                  <span>Importer une sauvegarde (JSON)</span>
                   <input
                     type="file"
                     accept="application/json"
@@ -3774,12 +3792,14 @@ export const AdminPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={async () => {
-                    await resetStudioData();
-                    notify('Données réinitialisées par défaut.');
+                    if (window.confirm('Voulez-vous vraiment réinitialiser toutes les données du studio aux valeurs d’origine ?')) {
+                      await resetStudioData();
+                      notify('Données réinitialisées avec succès.');
+                    }
                   }}
-                  className="inline-flex min-h-[44px] items-center gap-2 border border-red-300 px-4 py-2 text-xs font-medium text-red-900 uppercase hover:bg-red-50"
+                  className="inline-flex min-h-[44px] items-center gap-2 border border-red-200 bg-white px-4 py-2 text-xs font-semibold text-red-800 uppercase tracking-wider hover:bg-red-50 transition-colors cursor-pointer"
                 >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  <RotateCcw className="h-4 w-4" />
                   <span>Réinitialiser par défaut</span>
                 </button>
               </div>

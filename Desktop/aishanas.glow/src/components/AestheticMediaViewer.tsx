@@ -11,6 +11,7 @@ interface AestheticMediaViewerProps {
   autoPlayMuted?: boolean;
   showControls?: boolean;
   badge?: string;
+  objectPosition?: string;
 }
 
 export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
@@ -22,6 +23,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   autoPlayMuted = true,
   showControls = true,
   badge,
+  objectPosition = 'center 35%',
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlayMuted);
   const [isMuted, setIsMuted] = useState(true);
@@ -116,6 +118,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
               playsInline
               preload="metadata"
               onError={() => setMediaError(true)}
+              style={{ objectPosition }}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
 
@@ -194,6 +197,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
               alt={alt}
               loading="lazy"
               onError={() => setMediaError(true)}
+              style={{ objectPosition }}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
 
