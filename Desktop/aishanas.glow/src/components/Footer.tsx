@@ -26,15 +26,18 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-5 text-xs tracking-wider uppercase">
-          <a href="#tarifs" className="hover:text-ivory">
+          <Link to="/#tarifs" className="hover:text-ivory">
             Tarifs
-          </a>
-          <a href="#protocoles" className="hover:text-ivory">
+          </Link>
+          <Link to="/#protocoles" className="hover:text-ivory">
             Protocoles
-          </a>
-          <a href="#reservation" className="hover:text-ivory">
+          </Link>
+          <Link to="/#faq" className="hover:text-ivory">
+            FAQ
+          </Link>
+          <Link to="/reserver" className="hover:text-ivory text-ivory font-medium">
             Réserver
-          </a>
+          </Link>
           <a
             href={config.instagramUrl}
             target="_blank"

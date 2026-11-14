@@ -471,7 +471,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                     setSelectedServiceId(e.target.value);
                     setContraindicationsConfirmed(false);
                   }}
-                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                 >
                   {categoryServices.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -615,7 +615,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                       setErrorMessage('');
                     }}
                     required
-                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                   />
                   <span className="block text-[11px] text-taupe capitalize">
                     {formatFrenchDate(preferredDate)}
@@ -641,7 +641,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                         setErrorMessage('');
                       }}
                       required
-                      className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                      className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                     />
                     {dayAvailability.unavailableTimes.includes(preferredTime) ? (
                       <span className="block text-[11px] font-medium text-red-800">
@@ -802,7 +802,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                       setErrorMessage('');
                     }}
                     placeholder="Camille Laurent"
-                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                   />
                 </div>
 
@@ -826,7 +826,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                       setErrorMessage('');
                     }}
                     placeholder="06 12 34 56 78"
-                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                   />
                 </div>
               </div>
@@ -852,7 +852,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                       setErrorMessage('');
                     }}
                     placeholder="camille@gmail.com"
-                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                   />
                 </div>
 
@@ -870,7 +870,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                     value={clientInstagram}
                     onChange={(e) => setClientInstagram(e.target.value)}
                     placeholder="@votrecompte"
-                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                   />
                 </div>
               </div>
@@ -889,7 +889,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Ex. souplesse horaire, pose extérieure déjà présente..."
-                  className="w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  className="w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-base sm:text-sm text-charcoal"
                 />
               </div>
 
