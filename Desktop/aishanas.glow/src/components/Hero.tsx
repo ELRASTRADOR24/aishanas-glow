@@ -30,7 +30,7 @@ export const Hero: React.FC = () => {
         </h1>
 
         <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-stone/90 sm:text-base font-light">
-          Extensions de cils haute précision, rehaussement et blanchiment dentaire.
+          Extensions de cils haute précision et rehaussement soin profond.
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

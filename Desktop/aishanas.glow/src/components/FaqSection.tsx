@@ -33,10 +33,10 @@ const FAQ_ITEMS: FaqItem[] = [
       'Oui, les poses en cils marrons (effet très doux et naturel) ainsi que les finitions paillettes et décos sont disponibles. Il suffit de l’indiquer dans les précisions de votre réservation.',
   },
   {
-    id: 'blanchiment',
-    question: 'Quelles sont les contre-indications au blanchiment dentaire ?',
+    id: 'duree-pose',
+    question: 'Combien de temps dure une prestation de cils ?',
     answer:
-      'Le blanchiment est contre-indiqué en cas de grossesse, allaitement, caries non soignées sur les incisives, ou couronnes/facettes visibles sur le devant.',
+      'Chaque pose d’extensions de cils dure environ 2 heures pour garantir un travail soigné, précis cil par cil et une excellente tenue. Merci de venir sans maquillage des yeux pour optimiser la prise de la colle.',
   },
 ];
 

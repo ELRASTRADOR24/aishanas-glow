@@ -5,14 +5,14 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
     brandName: "Alshana's Glow",
     handle: '@alshanas.glow',
     instagramUrl: 'https://www.instagram.com/alshanas.glow/',
-    tagline: 'Extensions de cils, Rehaussement & Blanchiment dentaire',
+    tagline: 'Extensions de cils & Rehaussement de cils',
     locationLine: 'À deux pas de la Place Napoléon, La Roche-sur-Yon',
     exactStudioAddress: '2 rue du Général Gallieni, 85000 La Roche-sur-Yon',
     city: 'La Roche-sur-Yon (85000)',
     certificationLine: 'Technicienne certifiée 3x',
     heroTitle: 'L’art du regard et de l’éclat sur mesure',
     heroSubtitle:
-      'Extensions de cils, rehaussement soin profond et blanchiment dentaire à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.',
+      'Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.',
     instagramBannerTitle: 'Galerie, rétentions & contact direct sur Instagram',
     instagramBannerText:
       'Les réalisations complètes, retours clientes, tests de rétention et décorations de cils sont publiés en continu sur Instagram. En cas de doute sur une pose ou pour un réajustement particulier, échangez directement via @alshanas.glow.',
@@ -63,7 +63,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Pose complète',
       refillPrice: 30,
       refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 90,
+      durationMinutes: 120,
       description:
         'Une extension posée sur chaque cil naturel pour allonger et définir le regard tout en finesse.',
       note: 'Pas de remplissages successifs possibles',
@@ -81,7 +81,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Pose complète',
       refillPrice: 35,
       refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 105,
+      durationMinutes: 120,
       description:
         'Association harmonieuse de cil à cil et de bouquets 4D pour un regard texturé et étoffé.',
       note: 'Pas de remplissages successifs possibles',
@@ -117,7 +117,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Pose complète',
       refillPrice: 45,
       refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 135,
+      durationMinutes: 120,
       description:
         'Travail de volume complet sur mesure pour une ligne de cils dense, noire et sophistiquée.',
       note: 'Pas de remplissages successifs possibles',
@@ -135,7 +135,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Pose complète',
       refillPrice: 45,
       refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 135,
+      durationMinutes: 120,
       description:
         'Jeu de longueurs et de pointes définies pour un style éditorial moderne très structuré.',
       note: 'Pas de remplissages successifs possibles',
@@ -208,7 +208,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       imageUrl: '/srv-blanchiment-1.jpg',
       showImage: true,
       supportsLashOptions: false,
-      active: true,
+      active: false,
     },
     {
       id: 'bla-deuxieme',
@@ -225,7 +225,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       imageUrl: '/srv-blanchiment-2.jpg',
       showImage: true,
       supportsLashOptions: false,
-      active: true,
+      active: false,
     },
   ],
   addons: [

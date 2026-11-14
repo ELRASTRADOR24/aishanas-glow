@@ -6,9 +6,12 @@ export const ProtocolsSection: React.FC = () => {
   const { data } = useStudio();
   const [activeTab, setActiveTab] = useState<'rehaussement' | 'blanchiment'>('rehaussement');
 
+  const hasActiveBlanchiment = data.services.some((s) => s.category === 'blanchiment' && s.active);
+  const currentTab = hasActiveBlanchiment ? activeTab : 'rehaussement';
+
   const rehaussementBlocks = data.protocols.filter((p) => p.group === 'rehaussement');
   const blanchimentBlocks = data.protocols.filter((p) => p.group === 'blanchiment');
-  const visibleBlocks = activeTab === 'rehaussement' ? rehaussementBlocks : blanchimentBlocks;
+  const visibleBlocks = currentTab === 'rehaussement' ? rehaussementBlocks : blanchimentBlocks;
 
   return (
     <section
@@ -30,38 +33,40 @@ export const ProtocolsSection: React.FC = () => {
           </p>
         </div>
 
-        <div
-          role="tablist"
-          aria-label="Choisir le protocole de soin"
-          className="mx-auto mt-8 grid max-w-md grid-cols-2 border border-white/20 bg-black/30 p-1"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'rehaussement'}
-            onClick={() => setActiveTab('rehaussement')}
-            className={`min-h-[46px] px-4 py-2 text-xs font-medium tracking-[0.16em] uppercase transition-colors ${
-              activeTab === 'rehaussement'
-                ? 'bg-ivory text-obsidian'
-                : 'text-stone hover:text-ivory'
-            }`}
+        {hasActiveBlanchiment && (
+          <div
+            role="tablist"
+            aria-label="Choisir le protocole de soin"
+            className="mx-auto mt-8 grid max-w-md grid-cols-2 border border-white/20 bg-black/30 p-1"
           >
-            Rehaussement de cils
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'blanchiment'}
-            onClick={() => setActiveTab('blanchiment')}
-            className={`min-h-[46px] px-4 py-2 text-xs font-medium tracking-[0.16em] uppercase transition-colors ${
-              activeTab === 'blanchiment'
-                ? 'bg-ivory text-obsidian'
-                : 'text-stone hover:text-ivory'
-            }`}
-          >
-            Blanchiment dentaire
-          </button>
-        </div>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'rehaussement'}
+              onClick={() => setActiveTab('rehaussement')}
+              className={`min-h-[46px] px-4 py-2 text-xs font-medium tracking-[0.16em] uppercase transition-colors ${
+                activeTab === 'rehaussement'
+                  ? 'bg-ivory text-obsidian'
+                  : 'text-stone hover:text-ivory'
+              }`}
+            >
+              Rehaussement de cils
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'blanchiment'}
+              onClick={() => setActiveTab('blanchiment')}
+              className={`min-h-[46px] px-4 py-2 text-xs font-medium tracking-[0.16em] uppercase transition-colors ${
+                activeTab === 'blanchiment'
+                  ? 'bg-ivory text-obsidian'
+                  : 'text-stone hover:text-ivory'
+              }`}
+            >
+              Blanchiment dentaire
+            </button>
+          </div>
+        )}
 
         <div className="mt-8 space-y-5">
           {visibleBlocks.map((block) => (
