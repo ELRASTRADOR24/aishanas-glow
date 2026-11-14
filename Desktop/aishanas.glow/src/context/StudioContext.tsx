@@ -47,7 +47,7 @@ interface StudioContextValue {
   adminToken: string | null;
   refreshPublicStudio: () => Promise<void>;
   refreshAdminStudio: (tokenOverride?: string) => Promise<void>;
-  loginAdmin: (passcode: string) => Promise<void>;
+  loginAdmin: (passcode: string, email?: string) => Promise<void>;
   logoutAdmin: () => void;
   submitBooking: (payload: SubmitBookingPayload) => Promise<SubmitBookingResponse>;
   updateConfig: (partial: Partial<StudioConfig>) => Promise<void>;
@@ -191,11 +191,11 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  const loginAdmin = async (passcode: string) => {
+  const loginAdmin = async (passcode: string, email?: string) => {
     const res = await fetch('/api/admin/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ passcode }),
+      body: JSON.stringify({ passcode, email }),
     });
     const payload = (await res.json().catch(() => null)) as {
       token?: string;

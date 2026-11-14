@@ -209,10 +209,19 @@ export const AdminPage: React.FC = () => {
     resetStudioData,
   } = useStudio();
 
+  const [loginEmailInput, setLoginEmailInput] = useState(
+    data.config.contactEmail || 'alshanasglow@gmail.com'
+  );
   const [passcodeInput, setPasscodeInput] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+
+  useEffect(() => {
+    if (data.config.contactEmail) {
+      setLoginEmailInput(data.config.contactEmail);
+    }
+  }, [data.config.contactEmail]);
 
   const [activeTab, setActiveTab] = useState<AdminTab>('bookings');
   const [statusMessage, setStatusMessage] = useState('');
@@ -306,10 +315,10 @@ export const AdminPage: React.FC = () => {
     setAuthError('');
     setLoggingIn(true);
     try {
-      await loginAdmin(passcodeInput);
+      await loginAdmin(passcodeInput, loginEmailInput);
       setPasscodeInput('');
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Code d’accès incorrect.');
+      setAuthError(err instanceof Error ? err.message : 'Identifiants incorrects.');
     } finally {
       setLoggingIn(false);
     }
@@ -339,11 +348,35 @@ export const AdminPage: React.FC = () => {
           <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div className="space-y-1.5">
               <label
-                htmlFor="admin-passcode"
+                htmlFor="admin-email"
                 className="block text-xs font-medium tracking-wider text-stone uppercase"
               >
-                Code d’accès administrateur
+                E-mail administrateur
               </label>
+              <input
+                id="admin-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={loginEmailInput}
+                onChange={(e) => {
+                  setLoginEmailInput(e.target.value);
+                  setAuthError('');
+                }}
+                className="min-h-[48px] w-full border border-white/25 bg-black/50 px-3.5 text-ivory placeholder:text-stone/50"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="admin-passcode"
+                  className="block text-xs font-medium tracking-wider text-stone uppercase"
+                >
+                  Mot de passe
+                </label>
+              </div>
               <div className="relative flex items-center">
                 <input
                   id="admin-passcode"
@@ -351,17 +384,18 @@ export const AdminPage: React.FC = () => {
                   type={showPasscode ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
+                  placeholder="Code secret administrateur"
                   value={passcodeInput}
                   onChange={(e) => {
                     setPasscodeInput(e.target.value);
                     setAuthError('');
                   }}
-                  className="min-h-[48px] w-full border border-white/25 bg-black/50 pr-12 pl-3.5 text-ivory"
+                  className="min-h-[48px] w-full border border-white/25 bg-black/50 pr-12 pl-3.5 text-ivory placeholder:text-stone/50"
                 />
                 <button
                   type="button"
                   aria-pressed={showPasscode}
-                  aria-label={showPasscode ? 'Masquer le code' : 'Afficher le code'}
+                  aria-label={showPasscode ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   onClick={() => setShowPasscode((prev) => !prev)}
                   className="absolute right-1 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-stone hover:text-ivory"
                 >

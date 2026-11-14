@@ -782,8 +782,13 @@ app.post('/api/admin/login', (req, res) => {
   const studio = loadStudio();
   const secrets = loadEmailSecrets();
   const passcode = String(req.body?.passcode || '');
+  const email = String(req.body?.email || '').trim().toLowerCase();
+
+  if (email && email !== (studio.config.contactEmail || '').toLowerCase()) {
+    return res.status(401).json({ error: 'Adresse e-mail administrateur non reconnue.' });
+  }
   if (passcode !== studio.config.adminPasscode) {
-    return res.status(401).json({ error: 'Code d’accès incorrect.' });
+    return res.status(401).json({ error: 'Mot de passe incorrect.' });
   }
   const token = issueToken(secrets.tokenSecret);
   res.json({ token, studio: buildAdminStudio(studio) });

@@ -51,7 +51,7 @@ export const Hero: React.FC = () => {
 
         <div className="mt-8 inline-flex items-center justify-center gap-2 text-xs tracking-wider text-stone/70">
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>Place Napoléon, {config.city}</span>
+          <span>{config.locationLine}</span>
         </div>
       </div>
     </section>

@@ -4,7 +4,7 @@ export const DEFAULT_SERVER_STUDIO = {
     handle: '@alshanas.glow',
     instagramUrl: 'https://www.instagram.com/alshanas.glow/',
     tagline: 'Extensions de cils, Rehaussement & Blanchiment dentaire',
-    locationLine: 'À deux pas de la Place Napoléon, La Roche-sur-Yon',
+    locationLine: '2 rue du Général Gallieni, 85000 La Roche-sur-Yon',
     city: 'La Roche-sur-Yon (85000)',
     certificationLine: 'Technicienne certifiée 3x',
     heroTitle: 'L’art du regard et de l’éclat sur mesure',
@@ -13,7 +13,7 @@ export const DEFAULT_SERVER_STUDIO = {
     instagramBannerTitle: 'Galerie, rétentions & contact direct sur Instagram',
     instagramBannerText:
       'Les réalisations complètes, retours clientes, tests de rétention et décorations de cils sont publiés en continu sur Instagram. En cas de doute sur une pose ou pour un réajustement particulier, échangez directement via @alshanas.glow.',
-    contactEmail: 'johansonzoda@gmail.com',
+    contactEmail: 'alshanasglow@gmail.com',
     adminPasscode: 'alshana2026',
     showServiceImages: true,
     cloudinary: {

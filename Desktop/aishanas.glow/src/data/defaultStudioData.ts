@@ -6,7 +6,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
     handle: '@alshanas.glow',
     instagramUrl: 'https://www.instagram.com/alshanas.glow/',
     tagline: 'Extensions de cils, Rehaussement & Blanchiment dentaire',
-    locationLine: 'À deux pas de la Place Napoléon, La Roche-sur-Yon',
+    locationLine: '2 rue du Général Gallieni, 85000 La Roche-sur-Yon',
     city: 'La Roche-sur-Yon (85000)',
     certificationLine: 'Technicienne certifiée 3x',
     heroTitle: 'L’art du regard et de l’éclat sur mesure',
