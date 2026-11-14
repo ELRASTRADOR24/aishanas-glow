@@ -151,7 +151,9 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Dépose seule',
       refillPrice: null,
       durationMinutes: 25,
-      description: 'Retrait doux et respectueux des cils naturels pour une pose réalisée au studio.',
+      description:
+        'Retrait doux de vos extensions. Gratuite uniquement si vous refaites une nouvelle pose de cils juste après, ou 10€ pour une dépose seule.',
+      note: 'Gratuite si suivie immédiatement d’une nouvelle pose (option dépose + repose). 10€ si dépose seule.',
       imageUrl: '/srv-depose-studio.jpg',
       showImage: true,
       supportsLashOptions: false,
@@ -165,7 +167,8 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
       fullLabel: 'Dépose seule',
       refillPrice: null,
       durationMinutes: 35,
-      description: 'Retrait minutieux d’une pose réalisée en dehors du studio.',
+      description: 'Retrait minutieux d’une pose réalisée en dehors du studio (non offerte en repose).',
+      note: 'Tarif fixe 15€ pour les poses extérieures.',
       imageUrl: '/srv-depose-exterieur.jpg',
       showImage: true,
       supportsLashOptions: false,
@@ -227,8 +230,9 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
   addons: [
     {
       id: 'addon-depose-repose',
-      name: 'Dépose + repose',
-      description: 'Offerte lorsque la dépose est suivie immédiatement d’une nouvelle pose.',
+      name: 'Dépose + repose (Studio)',
+      description:
+        'Offerte uniquement si la dépose d’une pose du studio est suivie immédiatement d’une nouvelle pose.',
       price: 0,
       priceLabel: 'Gratuit',
       applicableCategories: ['extensions'],

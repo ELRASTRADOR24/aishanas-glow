@@ -152,12 +152,12 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
             <div className="flex items-center gap-2.5">
               <span className="h-2 w-2 rounded-full bg-charcoal shrink-0" />
               <span>
-                <strong className="text-charcoal font-semibold">Dépose → repose offerte :</strong>{' '}
-                Gratuit si vous effectuez une dépose suivie immédiatement d'une nouvelle pose.
+                <strong className="text-charcoal font-semibold">Règle de dépose :</strong>{' '}
+                Le retrait de vos cils est <strong>gratuit uniquement si vous refaites une pose de cils juste après</strong> (option à cocher lors de votre réservation). En revanche, la dépose seule sans nouvelle pose reste à 10€ (studio) ou 15€ (extérieur).
               </span>
             </div>
-            <span className="mt-2 inline-block font-serif text-sm font-bold text-charcoal sm:mt-0">
-              Offert
+            <span className="mt-2 inline-block font-serif text-sm font-bold text-charcoal sm:mt-0 whitespace-nowrap">
+              Gratuit si repose
             </span>
           </div>
         )}
