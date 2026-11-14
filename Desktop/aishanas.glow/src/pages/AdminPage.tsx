@@ -18,6 +18,7 @@ import {
   Send,
   Trash2,
   Upload,
+  Video,
   X,
   XCircle,
 } from 'lucide-react';
@@ -32,7 +33,8 @@ import type {
   ServiceItem,
 } from '../types/studio';
 import { formatFrenchDate } from '../utils/bookingLogic';
-import { optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/cloudinary';
+import { isVideoUrl, optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/cloudinary';
+import { AestheticMediaViewer } from '../components/AestheticMediaViewer';
 import { MonthlyScheduleCalendar } from '../components/MonthlyScheduleCalendar';
 
 type AdminTab = 'bookings' | 'schedule' | 'emails' | 'services' | 'content' | 'cloudinary';
@@ -301,6 +303,7 @@ export const AdminPage: React.FC = () => {
 
   // Cloudinary Upload State
   const [uploading, setUploading] = useState(false);
+  const [uploadingServiceId, setUploadingServiceId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [manualMediaLabel, setManualMediaLabel] = useState('');
   const [manualMediaUrl, setManualMediaUrl] = useState('');
@@ -852,6 +855,36 @@ export const AdminPage: React.FC = () => {
     } finally {
       setUploading(false);
       e.target.value = '';
+    }
+  };
+
+  const handleServiceMediaUpload = async (service: ServiceItem, file: File) => {
+    if (!file) return;
+    setUploadingServiceId(service.id);
+    try {
+      const result = await uploadToCloudinary(file, data.config.cloudinary);
+      await upsertService({
+        ...service,
+        imageUrl: result.secureUrl,
+        showImage: true,
+      });
+      await addMediaAsset({
+        id: `med-${Date.now()}`,
+        label: `${service.name} — ${file.name.replace(/\.[^.]+$/, '')}`,
+        url: result.secureUrl,
+        publicId: result.publicId,
+        category: service.category,
+        createdAt: new Date().toISOString(),
+      });
+      notify(
+        `${
+          result.resourceType === 'video' ? 'Vidéo' : 'Photo'
+        } téléversée avec succès sur Cloudinary et associée à ${service.name}.`
+      );
+    } catch (err: any) {
+      notifyError(err?.message || 'Erreur lors du téléversement Cloudinary.');
+    } finally {
+      setUploadingServiceId(null);
     }
   };
 
@@ -2395,17 +2428,17 @@ export const AdminPage: React.FC = () => {
 
                             <div>
                               <label className="block text-[11px] text-taupe uppercase">
-                                Illustration ou photo du soin
+                                Illustration ou vidéo du soin
                               </label>
                               <div className="mt-1 flex items-start gap-3">
-                                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden border border-stone bg-paper">
+                                <div className="flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden border border-stone bg-paper">
                                   {service.imageUrl ? (
-                                    <img
-                                      src={optimizeCloudinaryUrl(service.imageUrl, 160)}
+                                    <AestheticMediaViewer
+                                      url={service.imageUrl}
                                       alt={service.name}
-                                      className={`h-full w-full object-cover transition-opacity ${
-                                        isImageShownOnSite ? '' : 'opacity-35 grayscale'
-                                      }`}
+                                      aspectRatioClass="h-full w-full"
+                                      showControls={false}
+                                      allowExpand={true}
                                     />
                                   ) : (
                                     <span className="px-1 text-center text-[10px] leading-tight text-taupe uppercase">
@@ -2415,14 +2448,43 @@ export const AdminPage: React.FC = () => {
                                 </div>
 
                                 <div className="min-w-0 flex-1 space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <label className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 border border-charcoal bg-charcoal px-3 py-1 text-xs font-medium text-ivory hover:bg-silk transition-colors">
+                                      <Upload className="h-3.5 w-3.5" />
+                                      <span>
+                                        {uploadingServiceId === service.id
+                                          ? 'Téléversement...'
+                                          : 'Téléverser photo ou vidéo'}
+                                      </span>
+                                      <input
+                                        type="file"
+                                        accept="image/*,video/*"
+                                        disabled={uploadingServiceId === service.id}
+                                        onChange={(e) => {
+                                          const f = e.target.files?.[0];
+                                          if (f) handleServiceMediaUpload(service, f);
+                                          e.target.value = '';
+                                        }}
+                                        className="hidden"
+                                      />
+                                    </label>
+
+                                    {isVideoUrl(service.imageUrl) && (
+                                      <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-50 px-2 py-1 border border-emerald-200">
+                                        <Video className="h-3 w-3" />
+                                        <span>Format Vidéo actif</span>
+                                      </span>
+                                    )}
+                                  </div>
+
                                   <input
                                     type="text"
                                     value={service.imageUrl || ''}
-                                    placeholder="Ex. /srv-cil-a-cil.jpg ou lien de photo"
+                                    placeholder="Ex. Lien Cloudinary (image ou vidéo)"
                                     onChange={(e) =>
                                       upsertService({ ...service, imageUrl: e.target.value })
                                     }
-                                    className="min-h-[42px] w-full border border-stone bg-white px-3 py-2 text-xs"
+                                    className="min-h-[40px] w-full border border-stone bg-white px-3 py-1.5 text-xs"
                                   />
                                   {data.media.length > 0 && (
                                     <select
@@ -2435,15 +2497,15 @@ export const AdminPage: React.FC = () => {
                                             imageUrl: e.target.value,
                                             showImage: true,
                                           });
-                                          notify('Illustration ou photo attribuée à la prestation.');
+                                          notify('Média attribué à la prestation.');
                                         }
                                       }}
-                                      className="min-h-[38px] w-full border border-stone/70 bg-ivory px-2.5 text-xs"
+                                      className="min-h-[36px] w-full border border-stone/70 bg-ivory px-2.5 text-xs"
                                     >
-                                      <option value="">Choisir dans la bibliothèque d’images...</option>
+                                      <option value="">Choisir dans la bibliothèque média...</option>
                                       {data.media.map((m) => (
                                         <option key={m.id} value={m.url}>
-                                          {m.label}
+                                          {m.label} {isVideoUrl(m.url) ? '(Vidéo)' : ''}
                                         </option>
                                       ))}
                                     </select>
@@ -2946,9 +3008,23 @@ export const AdminPage: React.FC = () => {
                 </div>
               </div>
 
+              <div className="border border-charcoal/15 bg-paper p-4 text-xs leading-relaxed text-charcoal">
+                <p className="font-semibold uppercase tracking-wider text-[11px] text-charcoal">
+                  Configuration Cloudinary (Gratuite &amp; Illimitée — Photos &amp; Vidéos)
+                </p>
+                <p className="mt-1 text-taupe">
+                  Pour activer les téléversements directs de photos et vidéos (formats verticaux reels ou horizontaux) depuis votre téléphone ou ordinateur :
+                </p>
+                <ol className="mt-2 list-decimal list-inside space-y-1 text-taupe">
+                  <li>Créez un compte gratuit sur <strong>cloudinary.com</strong>.</li>
+                  <li>Dans vos paramètres Cloudinary (<strong>Settings &gt; Upload presets</strong>), créez un preset configuré en mode <strong>Unsigned</strong>.</li>
+                  <li>Saisissez votre <strong>Cloud Name</strong> et votre <strong>Upload Preset</strong> ci-dessus (ou ajoutez-les dans les variables d'environnement Vercel : <code className="bg-stone/30 px-1 py-0.5 rounded">CLOUDINARY_CLOUD_NAME</code> et <code className="bg-stone/30 px-1 py-0.5 rounded">CLOUDINARY_UPLOAD_PRESET</code>).</li>
+                </ol>
+              </div>
+
               <div className="border-t border-stone/70 pt-5">
                 <h3 className="font-serif text-2xl text-charcoal">
-                  Envoyer ou ajouter un média
+                  Envoyer ou ajouter un média (Photo ou Vidéo)
                 </h3>
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -2956,12 +3032,14 @@ export const AdminPage: React.FC = () => {
                     <label className="flex cursor-pointer flex-col items-center justify-center gap-2 py-4 text-center">
                       <Upload className="h-5 w-5 text-charcoal" aria-hidden="true" />
                       <span className="text-xs font-medium tracking-wider text-charcoal uppercase">
-                        {uploading ? 'Envoi vers Cloudinary...' : 'Importer un fichier vers Cloudinary'}
+                        {uploading ? 'Envoi vers Cloudinary...' : 'Importer photo ou vidéo'}
                       </span>
-                      <span className="text-[11px] text-taupe">Formats JPG, PNG ou WebP</span>
+                      <span className="text-[11px] text-taupe">
+                        Photos (JPG, PNG, WebP) &amp; Vidéos (MP4, MOV, WebM vertical/horizontal)
+                      </span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/*"
                         disabled={uploading}
                         onChange={handleCloudinaryUpload}
                         className="visually-hidden"

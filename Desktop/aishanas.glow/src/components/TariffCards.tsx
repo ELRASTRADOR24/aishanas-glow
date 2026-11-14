@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
 import type { BookingVariant, ServiceCategory, ServiceItem } from '../types/studio';
-import { optimizeCloudinaryUrl } from '../utils/cloudinary';
+import { AestheticMediaViewer } from './AestheticMediaViewer';
 
 interface TariffCardsProps {
   onSelectServiceForBooking?: (serviceId: string, variant: BookingVariant) => void;
@@ -67,31 +67,27 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                 className="group flex flex-col justify-between border border-charcoal/15 bg-white transition-all duration-300 hover:border-charcoal hover:shadow-[0_16px_36px_-18px_rgba(20,19,17,0.18)] cursor-pointer"
               >
                 <div>
-                  {/* Visuel carré sans zoom */}
-                  <div className="relative aspect-[16/10] w-full overflow-hidden bg-ivory border-b border-charcoal/10">
-                    {shouldShowImage(service) && service.imageUrl ? (
-                      <img
-                        src={optimizeCloudinaryUrl(service.imageUrl, 400)}
-                        alt={service.name}
-                        loading="lazy"
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center p-6 text-center text-taupe">
-                        <Sparkles className="h-6 w-6 opacity-40 mb-1" />
-                        <span className="text-[10px] uppercase tracking-widest font-medium">
-                          Alshana's Glow
+                  {shouldShowImage(service) && service.imageUrl ? (
+                    <AestheticMediaViewer
+                      url={service.imageUrl}
+                      alt={service.name}
+                      badge={CATEGORY_NAMES[service.category] || service.category}
+                      aspectRatioClass="aspect-[16/10]"
+                      allowExpand={true}
+                    />
+                  ) : (
+                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-ivory border-b border-charcoal/10 flex flex-col items-center justify-center p-6 text-center text-taupe">
+                      <Sparkles className="h-6 w-6 opacity-40 mb-1" />
+                      <span className="text-[10px] uppercase tracking-widest font-medium">
+                        Alshana's Glow
+                      </span>
+                      <div className="absolute top-3 left-3 z-10">
+                        <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
+                          {CATEGORY_NAMES[service.category] || service.category}
                         </span>
                       </div>
-                    )}
-
-                    {/* Badge Catégorie sobre */}
-                    <div className="absolute top-3 left-3 z-10">
-                      <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
-                        {CATEGORY_NAMES[service.category] || service.category}
-                      </span>
                     </div>
-                  </div>
+                  )}
 
                   {/* Contenu sobre : Titre, sous-titre & prix */}
                   <div className="p-5">

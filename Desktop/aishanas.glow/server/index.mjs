@@ -246,8 +246,21 @@ function loadStudio() {
         ? 'Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.'
         : existingConfig.heroSubtitle || DEFAULT_SERVER_STUDIO.config.heroSubtitle,
       cloudinary: {
-        ...DEFAULT_SERVER_STUDIO.config.cloudinary,
-        ...(existingConfig.cloudinary || {}),
+        cloudName:
+          existingConfig.cloudinary?.cloudName ||
+          process.env.CLOUDINARY_CLOUD_NAME ||
+          process.env.VITE_CLOUDINARY_CLOUD_NAME ||
+          DEFAULT_SERVER_STUDIO.config.cloudinary.cloudName,
+        uploadPreset:
+          existingConfig.cloudinary?.uploadPreset ||
+          process.env.CLOUDINARY_UPLOAD_PRESET ||
+          process.env.VITE_CLOUDINARY_UPLOAD_PRESET ||
+          DEFAULT_SERVER_STUDIO.config.cloudinary.uploadPreset,
+        folder:
+          existingConfig.cloudinary?.folder ||
+          process.env.CLOUDINARY_FOLDER ||
+          process.env.VITE_CLOUDINARY_FOLDER ||
+          DEFAULT_SERVER_STUDIO.config.cloudinary.folder,
       },
       bookingRules: {
         ...DEFAULT_SERVER_STUDIO.config.bookingRules,

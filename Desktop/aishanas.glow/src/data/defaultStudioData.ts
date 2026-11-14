@@ -20,9 +20,18 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
     adminPasscode: 'alshana2026',
     showServiceImages: true,
     cloudinary: {
-      cloudName: '',
-      uploadPreset: '',
-      folder: 'alshanas-glow',
+      cloudName:
+        (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME ||
+        (import.meta as any).env?.CLOUDINARY_CLOUD_NAME ||
+        '',
+      uploadPreset:
+        (import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET ||
+        (import.meta as any).env?.CLOUDINARY_UPLOAD_PRESET ||
+        '',
+      folder:
+        (import.meta as any).env?.VITE_CLOUDINARY_FOLDER ||
+        (import.meta as any).env?.CLOUDINARY_FOLDER ||
+        'alshanas-glow',
     },
     bookingRules: {
       flexibleHours: true,

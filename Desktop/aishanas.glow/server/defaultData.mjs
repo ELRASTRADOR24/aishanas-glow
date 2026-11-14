@@ -18,9 +18,9 @@ export const DEFAULT_SERVER_STUDIO = {
     adminPasscode: 'alshana2026',
     showServiceImages: true,
     cloudinary: {
-      cloudName: '',
-      uploadPreset: '',
-      folder: 'alshanas-glow',
+      cloudName: process.env.CLOUDINARY_CLOUD_NAME || process.env.VITE_CLOUDINARY_CLOUD_NAME || '',
+      uploadPreset: process.env.CLOUDINARY_UPLOAD_PRESET || process.env.VITE_CLOUDINARY_UPLOAD_PRESET || '',
+      folder: process.env.CLOUDINARY_FOLDER || process.env.VITE_CLOUDINARY_FOLDER || 'alshanas-glow',
     },
     bookingRules: {
       flexibleHours: true,
