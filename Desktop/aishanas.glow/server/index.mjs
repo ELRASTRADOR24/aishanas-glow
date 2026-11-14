@@ -820,11 +820,22 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function getServiceDuration(studio, serviceId) {
+  const srv = (studio.services || []).find((s) => s.id === serviceId);
+  if (srv?.category === 'extensions') return 120;
+  return srv?.durationMinutes || 120;
+}
+
 function buildPublicStudio(studio) {
   const { adminPasscode: _hidden, exactStudioAddress: _privateAddress, ...safeConfig } = studio.config;
   const occupiedSlots = (studio.bookings || [])
     .filter((b) => b.status === 'confirmed')
-    .map((b) => ({ date: b.preferredDate, time: b.preferredTime, status: b.status }));
+    .map((b) => ({
+      date: b.preferredDate,
+      time: b.preferredTime,
+      status: b.status,
+      durationMinutes: getServiceDuration(studio, b.serviceId),
+    }));
   const secrets = loadEmailSecrets();
 
   const publicLocation = safeConfig.locationLine?.includes('Gallieni')
@@ -840,13 +851,11 @@ function buildPublicStudio(studio) {
     : safeConfig.heroSubtitle;
 
   const publicServices = (studio.services || []).map((s) => {
-    if (s.category === 'extensions') {
-      return { ...s, durationMinutes: 120 };
-    }
-    if (s.category === 'blanchiment') {
-      return { ...s, active: false };
-    }
-    return s;
+    return {
+      ...s,
+      durationMinutes: 120,
+      active: s.category === 'blanchiment' ? false : s.active,
+    };
   });
 
   return {

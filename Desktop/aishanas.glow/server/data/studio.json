@@ -3,21 +3,21 @@
     "brandName": "Alshana's Glow",
     "handle": "@alshanas.glow",
     "instagramUrl": "https://www.instagram.com/alshanas.glow/",
-    "tagline": "Extensions de cils, Rehaussement & Blanchiment dentaire",
-    "locationLine": "À deux pas de la Place Napoléon, La Roche-sur-Yon",
+    "tagline": "Extensions de cils & Rehaussement de cils",
+    "locationLine": "2 rue du Général Gallieni, 85000 La Roche-sur-Yon",
     "exactStudioAddress": "2 rue du Général Gallieni, 85000 La Roche-sur-Yon",
     "city": "La Roche-sur-Yon (85000)",
     "certificationLine": "Technicienne certifiée 3x",
     "heroTitle": "L’art du regard et de l’éclat sur mesure",
-    "heroSubtitle": "Extensions de cils, rehaussement soin profond et blanchiment dentaire à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.",
+    "heroSubtitle": "Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.",
     "instagramBannerTitle": "Galerie, rétentions & contact direct sur Instagram",
     "instagramBannerText": "Les réalisations complètes, retours clientes, tests de rétention et décorations de cils sont publiés en continu sur Instagram. En cas de doute sur une pose ou pour un réajustement particulier, échangez directement via @alshanas.glow.",
     "contactEmail": "alshanasglow@gmail.com",
     "adminPasscode": "alshana2026",
     "showServiceImages": true,
     "cloudinary": {
-      "cloudName": "",
-      "uploadPreset": "",
+      "cloudName": "dvecpg1tz",
+      "uploadPreset": "alshanas_unsigned",
       "folder": "alshanas-glow"
     },
     "bookingRules": {
@@ -64,7 +64,7 @@
       "fullLabel": "Pose complète",
       "refillPrice": 30,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 90,
+      "durationMinutes": 120,
       "description": "Une extension posée sur chaque cil naturel pour allonger et définir le regard tout en finesse.",
       "note": "Pas de remplissages successifs possibles",
       "imageUrl": "/srv-cil-a-cil.jpg",
@@ -81,7 +81,7 @@
       "fullLabel": "Pose complète",
       "refillPrice": 35,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 105,
+      "durationMinutes": 120,
       "description": "Association harmonieuse de cil à cil et de bouquets 4D pour un regard texturé et étoffé.",
       "note": "Pas de remplissages successifs possibles",
       "imageUrl": "/srv-pose-mixte.jpg",
@@ -115,7 +115,7 @@
       "fullLabel": "Pose complète",
       "refillPrice": 45,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 135,
+      "durationMinutes": 120,
       "description": "Travail de volume complet sur mesure pour une ligne de cils dense, noire et sophistiquée.",
       "note": "Pas de remplissages successifs possibles",
       "imageUrl": "/srv-volume-russe.jpg",
@@ -132,7 +132,7 @@
       "fullLabel": "Pose complète",
       "refillPrice": 45,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 135,
+      "durationMinutes": 120,
       "description": "Jeu de longueurs et de pointes définies pour un style éditorial moderne très structuré.",
       "note": "Pas de remplissages successifs possibles",
       "imageUrl": "/srv-whispy-manga.jpg",
@@ -201,7 +201,7 @@
       "imageUrl": "/srv-blanchiment-1.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": true
+      "active": false
     },
     {
       "id": "bla-deuxieme",
@@ -217,7 +217,7 @@
       "imageUrl": "/srv-blanchiment-2.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": true
+      "active": false
     }
   ],
   "addons": [
@@ -384,7 +384,35 @@
       "createdAt": "2026-11-11T22:10:00.000Z"
     }
   ],
-  "bookings": [],
+  "bookings": [
+    {
+      "id": "bk-1794629501687",
+      "addonIds": [],
+      "addonNames": [],
+      "addonsPrice": 0,
+      "basePrice": 45,
+      "category": "extensions",
+      "clientEmail": "maydiesoums@gmail.com",
+      "clientInstagram": "@maydie_82",
+      "clientName": "Maydie ntary",
+      "clientPhone": "+33767663869",
+      "contraindicationsConfirmed": true,
+      "createdAt": "2026-11-14T04:11:41.687Z",
+      "isSupplementApplied": false,
+      "notes": "Je suis très sensible des yeux",
+      "preferredDate": "2026-11-25",
+      "preferredTime": "14:00",
+      "reference": "AG-7935",
+      "serviceId": "ext-pose-mixte",
+      "serviceName": "Pose mixte (cil à cil + 4D)",
+      "source": "web",
+      "status": "pending",
+      "supplementPrice": 0,
+      "totalPrice": 45,
+      "variant": "full",
+      "variantLabel": "Pose complète"
+    }
+  ],
   "emailLogs": [
     {
       "id": "mail-1794628078011-559",

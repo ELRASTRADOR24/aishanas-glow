@@ -49,6 +49,92 @@ export function optimizeCloudinaryUrl(url?: string | null, width?: number): stri
 }
 
 /**
+ * Compresses an image in browser memory before uploading.
+ * Automatically scales down large dimensions (max 1920px) and converts to WebP/JPEG (0.85 quality).
+ * Keeps original file if it's already small, vector (SVG), or animated (GIF).
+ */
+export async function compressImageBeforeUpload(
+  file: File,
+  maxDimension = 1920,
+  quality = 0.85
+): Promise<File> {
+  if (typeof window === 'undefined' || !file || !file.type?.startsWith('image/')) {
+    return file;
+  }
+  // Skip vector and animated images
+  if (file.type.includes('svg') || file.type.includes('gif')) {
+    return file;
+  }
+  // If already under 250KB and not huge, pass through
+  if (file.size < 250 * 1024) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (!width || !height) {
+          return resolve(file);
+        }
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return resolve(file);
+        }
+
+        // High quality smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const exportType = 'image/webp';
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              return resolve(file);
+            }
+            const cleanName = file.name.replace(/\.[^.]+$/, '') + '.webp';
+            const compressedFile = new File([blob], cleanName, {
+              type: exportType,
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          exportType,
+          quality
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+      img.src = objectUrl;
+    } catch {
+      resolve(file);
+    }
+  });
+}
+
+/**
  * Uploads an image or video directly from the browser to Cloudinary using an unsigned upload preset.
  * Uses the auto endpoint to support images, videos, reels, and stories.
  */
@@ -75,8 +161,11 @@ export async function uploadToCloudinary(
     throw new Error('Le fichier dépasse la taille maximale autorisée de 100 Mo.');
   }
 
+  // Compression automatique fluide pour les photos avant l'envoi
+  const processedFile = await compressImageBeforeUpload(file);
+
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', processedFile);
   formData.append('upload_preset', uploadPreset);
   const folder = (config?.folder || '').trim();
   if (folder) {
@@ -84,7 +173,7 @@ export async function uploadToCloudinary(
   }
 
   // Cloudinary auto/upload endpoint supports images and videos seamlessly
-  const isVideo = file.type?.startsWith('video/') || isVideoUrl(file.name);
+  const isVideo = processedFile.type?.startsWith('video/') || isVideoUrl(processedFile.name);
   const endpointType = isVideo ? 'video' : 'auto';
 
   let response: Response;
@@ -111,9 +200,12 @@ export async function uploadToCloudinary(
   }
 
   const data = await response.json();
+  const rawSecureUrl = data.secure_url as string;
+  const isVideoResult = (data.resource_type === 'video') || isVideo;
+
   return {
-    secureUrl: data.secure_url as string,
+    secureUrl: isVideoResult ? rawSecureUrl : optimizeCloudinaryUrl(rawSecureUrl),
     publicId: data.public_id as string,
-    resourceType: (data.resource_type as 'image' | 'video') || (isVideo ? 'video' : 'image'),
+    resourceType: isVideoResult ? 'video' : 'image',
   };
 }

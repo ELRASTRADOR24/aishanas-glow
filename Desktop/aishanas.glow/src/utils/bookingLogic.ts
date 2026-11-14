@@ -20,10 +20,18 @@ export interface SlotAvailability {
   reason?: string;
 }
 
+export function timeStringToMinutes(timeStr: string): number {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const [h, m] = timeStr.split(':').map(Number);
+  if (Number.isNaN(h)) return 0;
+  return h * 60 + (Number.isNaN(m) ? 0 : m);
+}
+
 export function getDayAvailability(
   dateStr: string,
   rules: BookingRules,
-  occupiedSlots: OccupiedSlot[]
+  occupiedSlots: OccupiedSlot[],
+  serviceDurationMinutes: number = 120
 ): {
   isDayOpen: boolean;
   flexibleHours: boolean;
@@ -87,14 +95,39 @@ export function getDayAvailability(
     };
   }
 
-  const confirmedTimes = new Set(
-    occupiedSlots
-      .filter((s) => s.date === dateStr && s.status === 'confirmed')
-      .map((s) => s.time)
-  );
-  const blockedTimes = new Set(
-    rules.blockedSlots.filter((b) => b.date === dateStr).map((b) => b.time)
-  );
+  const dayOccupied = occupiedSlots.filter((s) => s.date === dateStr && s.status === 'confirmed');
+  const dayBlocked = rules.blockedSlots.filter((b) => b.date === dateStr);
+
+  const isSlotOverlapping = (candidateTime: string): { overlapping: boolean; reason?: string } => {
+    const candStart = timeStringToMinutes(candidateTime);
+    const candEnd = candStart + serviceDurationMinutes;
+
+    for (const occ of dayOccupied) {
+      const occStart = timeStringToMinutes(occ.time);
+      const occDur = occ.durationMinutes || 120; // 2h de pose
+      const occEnd = occStart + occDur;
+      if (Math.max(candStart, occStart) < Math.min(candEnd, occEnd)) {
+        return {
+          overlapping: true,
+          reason:
+            candidateTime === occ.time
+              ? 'Créneau déjà réservé'
+              : `Indisponible (soin de 2h en cours à ${occ.time})`,
+        };
+      }
+    }
+
+    for (const blk of dayBlocked) {
+      if (blk.time === candidateTime) {
+        return { overlapping: true, reason: 'Indisponible' };
+      }
+    }
+
+    return { overlapping: false };
+  };
+
+  const confirmedTimes = new Set(dayOccupied.map((s) => s.time));
+  const blockedTimes = new Set(dayBlocked.map((b) => b.time));
   const unavailableTimes = Array.from(new Set([...confirmedTimes, ...blockedTimes])).sort((a, b) =>
     a.localeCompare(b)
   );
@@ -109,26 +142,24 @@ export function getDayAvailability(
   }
 
   const allSlots: SlotAvailability[] = [
-    ...rules.standardSlots.map((time) => ({
-      time,
-      isEvening: false,
-      available: !confirmedTimes.has(time) && !blockedTimes.has(time),
-      reason: confirmedTimes.has(time)
-        ? 'Créneau déjà réservé'
-        : blockedTimes.has(time)
-          ? 'Indisponible'
-          : undefined,
-    })),
-    ...rules.eveningSlots.map((time) => ({
-      time,
-      isEvening: true,
-      available: !confirmedTimes.has(time) && !blockedTimes.has(time),
-      reason: confirmedTimes.has(time)
-        ? 'Créneau déjà réservé'
-        : blockedTimes.has(time)
-          ? 'Indisponible'
-          : undefined,
-    })),
+    ...rules.standardSlots.map((time) => {
+      const check = isSlotOverlapping(time);
+      return {
+        time,
+        isEvening: false,
+        available: !check.overlapping,
+        reason: check.reason,
+      };
+    }),
+    ...rules.eveningSlots.map((time) => {
+      const check = isSlotOverlapping(time);
+      return {
+        time,
+        isEvening: true,
+        available: !check.overlapping,
+        reason: check.reason,
+      };
+    }),
   ];
 
   const hasAvailable = allSlots.some((s) => s.available);

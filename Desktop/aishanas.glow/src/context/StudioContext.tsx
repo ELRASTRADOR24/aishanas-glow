@@ -121,7 +121,7 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
     },
     services: (raw.services ?? DEFAULT_STUDIO_DATA.services).map((s) => ({
       ...s,
-      durationMinutes: s.category === 'extensions' ? 120 : s.durationMinutes,
+      durationMinutes: 120,
       active: s.category === 'blanchiment' ? (s.active === true ? false : s.active ?? false) : s.active ?? true,
       showImage: s.showImage ?? true,
     })),

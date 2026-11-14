@@ -129,6 +129,7 @@ export interface OccupiedSlot {
   date: string;
   time: string;
   status: BookingStatus;
+  durationMinutes?: number;
 }
 
 export interface EmailLogEntry {

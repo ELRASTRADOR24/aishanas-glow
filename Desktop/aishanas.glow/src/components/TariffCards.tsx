@@ -89,7 +89,7 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                     </div>
                   )}
 
-                  {/* Contenu sobre : Titre, sous-titre & prix */}
+                  {/* Contenu sobre : Titre, sous-titre, durée & prix */}
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -101,6 +101,11 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                             {service.subtitle}
                           </p>
                         )}
+                        <div className="mt-2.5 flex items-center gap-2">
+                          <span className="inline-flex items-center border border-charcoal/10 bg-ivory/60 px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
+                            Durée : {service.category === 'extensions' ? '2h' : `${service.durationMinutes} min`}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="text-right shrink-0">

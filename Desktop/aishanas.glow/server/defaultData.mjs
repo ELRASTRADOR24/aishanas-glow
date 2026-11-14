@@ -149,7 +149,7 @@ export const DEFAULT_SERVER_STUDIO = {
       fullPrice: 10,
       fullLabel: 'Dépose seule',
       refillPrice: null,
-      durationMinutes: 25,
+      durationMinutes: 120,
       description:
         'Retrait doux de vos extensions. Gratuite uniquement si vous refaites une nouvelle pose de cils juste après, ou 10€ pour une dépose seule.',
       note: 'Gratuite si suivie immédiatement d’une nouvelle pose (option dépose + repose). 10€ si dépose seule.',
@@ -165,7 +165,7 @@ export const DEFAULT_SERVER_STUDIO = {
       fullPrice: 15,
       fullLabel: 'Dépose seule',
       refillPrice: null,
-      durationMinutes: 35,
+      durationMinutes: 120,
       description: 'Retrait minutieux d’une pose réalisée en dehors du studio (non offerte en repose).',
       note: 'Tarif fixe 15€ pour les poses extérieures.',
       imageUrl: '/srv-depose-exterieur.jpg',
@@ -182,7 +182,7 @@ export const DEFAULT_SERVER_STUDIO = {
       fullLabel: 'Sans teinture',
       refillPrice: 35,
       refillLabel: 'Avec teinture',
-      durationMinutes: 60,
+      durationMinutes: 120,
       description:
         'Courbure durable dès la racine avec soin enrichi en vitamines, Aloe Vera, Centella Asiatica, Acide Hyaluronique et Peptides fortifiants.',
       note: 'Option teinture : effet mascara semi-permanent',
@@ -199,7 +199,7 @@ export const DEFAULT_SERVER_STUDIO = {
       fullPrice: 70,
       fullLabel: 'Séance Ultra-White',
       refillPrice: null,
-      durationMinutes: 60,
+      durationMinutes: 120,
       description:
         'Traitement non abrasif conforme à la directive européenne 2011/84/UE. Testé dermatologiquement et cliniquement.',
       note: '2 séances recommandées pour une première fois (résultat durable)',
@@ -216,7 +216,7 @@ export const DEFAULT_SERVER_STUDIO = {
       fullPrice: 55,
       fullLabel: 'Séance complémentaire',
       refillPrice: null,
-      durationMinutes: 45,
+      durationMinutes: 120,
       description:
         'Idéale pour fixer le blanchiment après la première séance ou entretenir l’éclat du sourire.',
       note: 'Gel désensibilisant inclus dans chaque prestation',

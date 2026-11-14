@@ -84,9 +84,25 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     }
   }, [preselectedServiceId, preselectedVariant, selectionTick]);
 
+  const currentService = useMemo(
+    () => activeServices.find((s) => s.id === selectedServiceId) || activeServices[0],
+    [activeServices, selectedServiceId]
+  );
+
+  const categoryServices = useMemo(
+    () => activeServices.filter((s) => s.category === selectedCategory),
+    [activeServices, selectedCategory]
+  );
+
   const dayAvailability = useMemo(
-    () => getDayAvailability(preferredDate, bookingRules, data.occupiedSlots),
-    [preferredDate, bookingRules, data.occupiedSlots]
+    () =>
+      getDayAvailability(
+        preferredDate,
+        bookingRules,
+        data.occupiedSlots,
+        currentService?.category === 'extensions' ? 120 : currentService?.durationMinutes || 120
+      ),
+    [preferredDate, bookingRules, data.occupiedSlots, currentService]
   );
 
   useEffect(() => {
@@ -104,16 +120,6 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
       setPreferredTime(firstAvailable.time);
     }
   }, [dayAvailability, preferredTime]);
-
-  const currentService = useMemo(
-    () => activeServices.find((s) => s.id === selectedServiceId) || activeServices[0],
-    [activeServices, selectedServiceId]
-  );
-
-  const categoryServices = useMemo(
-    () => activeServices.filter((s) => s.category === selectedCategory),
-    [activeServices, selectedCategory]
-  );
 
   const availableAddons = useMemo(
     () =>
@@ -450,8 +456,13 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                           {currentService.fullPrice}€
                         </span>
                       </div>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="inline-flex items-center border border-charcoal/15 bg-white px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
+                          Durée : {currentService.category === 'extensions' ? '2h' : `${currentService.durationMinutes} min`}
+                        </span>
+                      </div>
                       {currentService.description && (
-                        <p className="mt-1 text-xs text-taupe leading-relaxed">
+                        <p className="mt-1.5 text-xs text-taupe leading-relaxed">
                           {currentService.description}
                         </p>
                       )}
@@ -988,6 +999,12 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                   <span className="text-taupe">Prestation :</span>
                   <span className="font-medium text-right">
                     {confirmedBooking.serviceName} ({confirmedBooking.variantLabel})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-taupe">Durée prévue :</span>
+                  <span className="font-medium">
+                    {currentService?.category === 'extensions' ? '2h (120 min)' : `${currentService?.durationMinutes || 60} min`}
                   </span>
                 </div>
                 <div className="flex justify-between">

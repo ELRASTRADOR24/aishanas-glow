@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
+  ArrowUpRight,
   Calendar,
   CheckCircle2,
   ChevronDown,
   Clock,
   Download,
+  Euro,
   Eye,
   EyeOff,
   Image as ImageIcon,
@@ -16,6 +19,7 @@ import {
   RotateCcw,
   Save,
   Send,
+  Sparkles,
   Trash2,
   Upload,
   Video,
@@ -37,7 +41,7 @@ import { isVideoUrl, optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/
 import { AestheticMediaViewer } from '../components/AestheticMediaViewer';
 import { MonthlyScheduleCalendar } from '../components/MonthlyScheduleCalendar';
 
-type AdminTab = 'bookings' | 'schedule' | 'emails' | 'services' | 'content' | 'cloudinary';
+type AdminTab = 'dashboard' | 'bookings' | 'schedule' | 'emails' | 'services' | 'content' | 'cloudinary';
 
 const STATUS_LABELS: Record<BookingStatus, string> = {
   pending: 'En attente de validation',
@@ -227,7 +231,7 @@ export const AdminPage: React.FC = () => {
     }
   }, [data.config.contactEmail]);
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('bookings');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [statusMessage, setStatusMessage] = useState('');
   const [statusError, setStatusError] = useState('');
 
@@ -283,7 +287,7 @@ export const AdminPage: React.FC = () => {
     fullLabel: 'Pose complète',
     refillPrice: null,
     refillLabel: 'Remplissage 3 semaines',
-    durationMinutes: 90,
+    durationMinutes: 120,
     description: '',
     imageUrl: '',
     showImage: true,
@@ -787,7 +791,7 @@ export const AdminPage: React.FC = () => {
       fullLabel: 'Pose complète',
       refillPrice: null,
       refillLabel: 'Remplissage 3 semaines',
-      durationMinutes: 90,
+      durationMinutes: 120,
       description: '',
       imageUrl: '',
       showImage: true,
@@ -988,6 +992,7 @@ export const AdminPage: React.FC = () => {
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto py-2">
           {(
             [
+              { id: 'dashboard', label: 'Tableau de bord' },
               { id: 'bookings', label: `Rendez-vous (${data.bookings.length})` },
               { id: 'schedule', label: 'Horaires & Supplément' },
               { id: 'emails', label: 'E-mails & Journal' },
@@ -1013,6 +1018,327 @@ export const AdminPage: React.FC = () => {
       </nav>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {/* TAB 0: VRAI TABLEAU DE BORD D'ADMINISTRATION */}
+        {activeTab === 'dashboard' && (
+          <section className="space-y-8 animate-fade-in">
+            {/* Header avec bienvenue et statut en direct */}
+            <div className="flex flex-col gap-4 border border-stone bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span className="text-[10px] font-semibold tracking-widest text-taupe uppercase">
+                  Alshana's Glow Studio · Administration
+                </span>
+                <h2 className="mt-1 font-serif text-3xl text-charcoal">
+                  Tableau de bord
+                </h2>
+                <p className="mt-1 text-xs text-taupe">
+                  Gestion centralisée des rendez-vous (2h par prestation), des visuels photos/vidéos et des textes du site.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center gap-2 border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Studio &amp; Réservations actifs</span>
+                </span>
+                <Link
+                  to="/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-[40px] items-center gap-1.5 border border-charcoal bg-charcoal px-4 py-1.5 text-xs font-medium text-ivory uppercase tracking-wider hover:bg-silk transition-colors"
+                >
+                  <span>Voir le site public</span>
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Grille de 4 Cartes Statistiques Clés (KPIs) */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                onClick={() => setActiveTab('bookings')}
+                className={`border p-5 transition-all cursor-pointer ${
+                  data.bookings.filter((b) => b.status === 'pending').length > 0
+                    ? 'border-amber-400 bg-amber-50/50 hover:border-amber-600'
+                    : 'border-stone bg-white hover:border-charcoal'
+                }`}
+              >
+                <div className="flex items-center justify-between text-taupe">
+                  <span className="text-[11px] font-medium tracking-wider uppercase">À valider</span>
+                  <Clock className="h-4 w-4" />
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="font-serif text-3xl font-medium text-charcoal">
+                    {data.bookings.filter((b) => b.status === 'pending').length}
+                  </span>
+                  {data.bookings.filter((b) => b.status === 'pending').length > 0 && (
+                    <span className="text-[11px] font-semibold text-amber-700">Demande(s) en attente</span>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-taupe">Cliquez pour consulter</p>
+              </div>
+
+              <div
+                onClick={() => setActiveTab('bookings')}
+                className="border border-stone bg-white p-5 transition-all hover:border-charcoal cursor-pointer"
+              >
+                <div className="flex items-center justify-between text-taupe">
+                  <span className="text-[11px] font-medium tracking-wider uppercase">Confirmés</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div className="mt-3">
+                  <span className="font-serif text-3xl font-medium text-charcoal">
+                    {data.bookings.filter((b) => b.status === 'confirmed').length}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-taupe">Rendez-vous programmés</p>
+              </div>
+
+              <div className="border border-stone bg-white p-5">
+                <div className="flex items-center justify-between text-taupe">
+                  <span className="text-[11px] font-medium tracking-wider uppercase">CA prévisionnel</span>
+                  <Euro className="h-4 w-4 text-charcoal" />
+                </div>
+                <div className="mt-3">
+                  <span className="font-serif text-3xl font-medium text-charcoal">
+                    {data.bookings
+                      .filter((b) => b.status === 'confirmed')
+                      .reduce((sum, b) => sum + (b.totalPrice || 0), 0)}
+                    €
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-taupe">Sur réservations validées</p>
+              </div>
+
+              <div
+                onClick={() => setActiveTab('services')}
+                className="border border-stone bg-white p-5 transition-all hover:border-charcoal cursor-pointer"
+              >
+                <div className="flex items-center justify-between text-taupe">
+                  <span className="text-[11px] font-medium tracking-wider uppercase">Prestations</span>
+                  <Sparkles className="h-4 w-4 text-charcoal" />
+                </div>
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="font-serif text-3xl font-medium text-charcoal">
+                    {data.services.filter((s) => s.active).length}
+                  </span>
+                  <span className="text-xs text-taupe">/ {data.services.length}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-taupe">
+                  Durée uniforme : 2h par soin
+                </p>
+              </div>
+            </div>
+
+            {/* Alertes Rendez-vous à traiter en priorité */}
+            {data.bookings.filter((b) => b.status === 'pending').length > 0 && (
+              <div className="border-2 border-amber-400 bg-amber-50/40 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-amber-900">
+                    <AlertCircle className="h-5 w-5 text-amber-600" />
+                    <h3 className="font-serif text-xl font-medium">
+                      Demande(s) de rendez-vous en attente de votre confirmation
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('bookings')}
+                    className="text-xs font-semibold underline text-amber-900 hover:text-black"
+                  >
+                    Voir la liste complète
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {data.bookings
+                    .filter((b) => b.status === 'pending')
+                    .slice(0, 3)
+                    .map((booking) => (
+                      <div
+                        key={booking.id}
+                        className="border border-amber-300 bg-white p-4 space-y-2 shadow-xs"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-semibold text-charcoal">{booking.clientName}</span>
+                            <p className="text-xs text-taupe">{booking.clientPhone}</p>
+                          </div>
+                          <span className="font-serif font-bold text-charcoal">{booking.totalPrice} €</span>
+                        </div>
+                        <p className="text-xs font-medium text-charcoal">
+                          {booking.serviceName} ({booking.variantLabel})
+                        </p>
+                        <div className="text-[11px] text-taupe flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatFrenchDate(booking.preferredDate)} à {booking.preferredTime}</span>
+                          <span className="border border-stone/60 px-1 py-0.2 text-[9px] uppercase font-bold text-charcoal">2h</span>
+                        </div>
+                        <div className="pt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleBookingDecision(booking, 'confirmed')}
+                            className="flex-1 min-h-[34px] border border-charcoal bg-charcoal text-ivory text-xs font-medium uppercase tracking-wider hover:bg-silk transition-colors"
+                          >
+                            Valider (2h)
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Remplacement Rapide des Photos de chaque soin (avec cadrage 16/10 parfait) */}
+            <div className="border border-stone bg-white p-6 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="font-serif text-2xl text-charcoal">
+                    Photos des prestations (Cadres 16/10 &amp; Compression fluide)
+                  </h3>
+                  <p className="text-xs text-taupe">
+                    Remplacez directement l'illustration d'une prestation par votre vraie photo ou vidéo.
+                    L'image est automatiquement compressée et s'adapte sans aucune déformation.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('services')}
+                  className="text-xs text-taupe underline hover:text-charcoal self-start sm:self-auto"
+                >
+                  Gérer les tarifs et descriptions
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {data.services.map((service) => (
+                  <div
+                    key={service.id}
+                    className="flex flex-col justify-between border border-stone/80 bg-paper p-4 space-y-3"
+                  >
+                    <div>
+                      {/* Cadre média strictement au ratio 16/10ème pour zéro déformation */}
+                      <div className="relative aspect-[16/10] w-full overflow-hidden border border-stone bg-black/5">
+                        <AestheticMediaViewer
+                          url={service.imageUrl}
+                          alt={service.name}
+                          aspectRatioClass="h-full w-full"
+                          badge="2h"
+                        />
+                      </div>
+
+                      <div className="mt-3 flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-serif text-base font-medium text-charcoal">
+                            {service.name}
+                          </h4>
+                          <span className="inline-block text-[10px] text-taupe uppercase tracking-wider">
+                            Durée : 2h · {service.fullPrice} €
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            upsertService({ ...service, active: !service.active })
+                          }
+                          className={`border px-2 py-0.5 text-[10px] uppercase font-medium transition-colors ${
+                            service.active
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                              : 'border-stone bg-stone/20 text-taupe'
+                          }`}
+                        >
+                          {service.active ? 'Affiché' : 'Masqué'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bouton de remplacement direct de la photo */}
+                    <div className="pt-2 border-t border-stone/40">
+                      <label className="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-2 border border-charcoal bg-white px-3 py-1.5 text-xs font-medium text-charcoal hover:bg-ivory transition-colors">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>
+                          {uploadingServiceId === service.id
+                            ? 'Compression & Envoi...'
+                            : 'Changer la photo (ou vidéo)'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          disabled={uploadingServiceId === service.id}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleServiceMediaUpload(service, f);
+                            e.target.value = '';
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Informations Générales du Studio Modifiables Directement */}
+            <div className="border border-stone bg-white p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif text-2xl text-charcoal">
+                    Textes &amp; Coordonnées du Studio
+                  </h3>
+                  <p className="text-xs text-taupe">
+                    Modifiez les informations affichées sur la vitrine du site.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('content')}
+                  className="text-xs text-taupe underline hover:text-charcoal"
+                >
+                  Éditeur complet des protocoles &gt;
+                </button>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Slogan principal</label>
+                  <input
+                    type="text"
+                    value={data.config.tagline}
+                    onChange={(e) => updateConfig({ tagline: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">E-mail de contact &amp; alertes</label>
+                  <input
+                    type="email"
+                    value={data.config.contactEmail}
+                    onChange={(e) => updateConfig({ contactEmail: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Ligne de localisation publique</label>
+                  <input
+                    type="text"
+                    value={data.config.locationLine}
+                    onChange={(e) => updateConfig({ locationLine: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Instagram (@)</label>
+                  <input
+                    type="text"
+                    value={data.config.handle}
+                    onChange={(e) => updateConfig({ handle: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* TAB 1: BOOKINGS & VALIDATION WORKFLOW */}
         {activeTab === 'bookings' && (
           <section className="space-y-6">
