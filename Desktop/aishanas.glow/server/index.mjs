@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import nodemailer from 'nodemailer';
+import mongoose from 'mongoose';
 import { DEFAULT_SERVER_STUDIO } from './defaultData.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +23,88 @@ const DEFAULT_RESEND_KEY =
   Buffer.from('cmVfU2RCVDdhVHNfNzMxak5aNkpGOWpzZ3RqRDNVUU41dkZV', 'base64').toString('ascii');
 const DEFAULT_RESEND_FROM = "Alshana's Glow <contact@xn--dynaceglobalsant-top-q2b.com>";
 export const SITE_URL = 'https://aishanas-glow.vercel.app';
+
+const MONGODB_URI =
+  process.env.MONGODB_URI ||
+  'mongodb+srv://admin:4aOH4utY2gJM6q4H@cluster0.tmgtwyi.mongodb.net/alshanas_glow?retryWrites=true&w=majority';
+
+// MongoDB / Mongoose persistent schemas
+const StudioDocSchema = new mongoose.Schema(
+  {
+    key: { type: String, unique: true, default: 'main' },
+    data: { type: Object, required: true },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { collection: 'studio_data', strict: false }
+);
+
+const BookingDocSchema = new mongoose.Schema(
+  {
+    id: { type: String, unique: true, required: true },
+    reference: { type: String, required: true },
+    createdAt: { type: String, required: true },
+    status: { type: String, required: true },
+    clientName: String,
+    clientPhone: String,
+    clientEmail: String,
+    clientInstagram: String,
+    serviceId: String,
+    serviceName: String,
+    category: String,
+    variant: String,
+    variantLabel: String,
+    addonIds: [String],
+    addonNames: [String],
+    preferredDate: String,
+    preferredTime: String,
+    isSupplementApplied: Boolean,
+    supplementReason: String,
+    basePrice: Number,
+    addonsPrice: Number,
+    supplementPrice: Number,
+    totalPrice: Number,
+    contraindicationsConfirmed: Boolean,
+    notes: String,
+    source: String,
+    adminDecisionNote: String,
+  },
+  { collection: 'bookings', strict: false }
+);
+
+const StudioModel = mongoose.models.StudioDoc || mongoose.model('StudioDoc', StudioDocSchema);
+const BookingModel = mongoose.models.BookingDoc || mongoose.model('BookingDoc', BookingDocSchema);
+
+let isMongoConnected = false;
+let mongoConnPromise = null;
+
+async function getMongoConnection() {
+  if (isMongoConnected && mongoose.connection.readyState === 1) return true;
+  if (mongoConnPromise) return mongoConnPromise;
+
+  mongoConnPromise = (async () => {
+    try {
+      await mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        bufferCommands: false,
+      });
+      isMongoConnected = true;
+      console.log('[MongoDB Atlas] Connecté avec succès à la base alshanas_glow');
+      await syncStudioFromMongo();
+      return true;
+    } catch (err) {
+      console.warn('[MongoDB Atlas Warning] Connexion différée:', err?.message);
+      isMongoConnected = false;
+      return false;
+    } finally {
+      mongoConnPromise = null;
+    }
+  })();
+
+  return mongoConnPromise;
+}
+
+// Background initial connect
+getMongoConnection().catch(() => {});
 
 function loadDotEnv() {
   try {
@@ -84,6 +167,36 @@ function writeJsonSafe(filePath, value) {
 
 let memoryStudio = null;
 
+async function syncStudioFromMongo() {
+  try {
+    const doc = await StudioModel.findOne({ key: 'main' }).lean();
+    if (doc?.data) {
+      const merged = {
+        ...DEFAULT_SERVER_STUDIO,
+        ...doc.data,
+      };
+      const mongoBookings = await BookingModel.find({}).sort({ createdAt: -1 }).lean();
+      if (mongoBookings && mongoBookings.length > 0) {
+        merged.bookings = mongoBookings.map((b) => {
+          const { _id, __v, ...rest } = b;
+          return rest;
+        });
+      }
+      memoryStudio = merged;
+      writeJsonSafe(STUDIO_FILE, memoryStudio);
+    } else {
+      const current = loadStudio();
+      await StudioModel.findOneAndUpdate(
+        { key: 'main' },
+        { data: current, updatedAt: new Date() },
+        { upsert: true }
+      );
+    }
+  } catch (err) {
+    console.warn('[MongoDB Sync Warning]:', err?.message);
+  }
+}
+
 function loadStudio() {
   if (memoryStudio) return memoryStudio;
   let existing = readJsonSafe(STUDIO_FILE, null);
@@ -127,6 +240,15 @@ function loadStudio() {
 function saveStudio(studio) {
   memoryStudio = studio;
   writeJsonSafe(STUDIO_FILE, studio);
+  getMongoConnection().then((connected) => {
+    if (connected) {
+      StudioModel.findOneAndUpdate(
+        { key: 'main' },
+        { data: studio, updatedAt: new Date() },
+        { upsert: true }
+      ).catch((err) => console.warn('[MongoDB Studio Save Error]:', err?.message));
+    }
+  }).catch(() => {});
 }
 
 let memorySecrets = null;
@@ -672,12 +794,15 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 
 // Diagnostic health ping
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  await getMongoConnection().catch(() => {});
   res.json({
     ok: true,
     isVercel: IS_VERCEL,
     siteUrl: SITE_URL,
     tmpExists: fs.existsSync('/tmp'),
+    mongoConnected: mongoose.connection.readyState === 1,
+    database: 'MongoDB Atlas (cluster0.tmgtwyi.mongodb.net/alshanas_glow)',
   });
 });
 
@@ -801,6 +926,7 @@ app.post('/api/bookings', async (req, res, next) => {
 
     studio.bookings = [booking, ...(studio.bookings || [])];
     saveStudio(studio);
+    BookingModel.findOneAndUpdate({ id: booking.id }, booking, { upsert: true }).catch(() => {});
 
     const adminRecipient = studio.config.contactEmail || 'alshanasglow@gmail.com';
     const siteUrl = SITE_URL;
@@ -892,7 +1018,8 @@ app.post('/api/bookings/confirm-option', async (req, res) => {
     booking.preferredDate = date;
     booking.preferredTime = time;
     booking.adminDecisionNote = `Option validée directement par la cliente pour le ${formatDateFr(date)} à ${time}.`;
-    writeJsonSafe(STUDIO_FILE, studio);
+    saveStudio(studio);
+    BookingModel.findOneAndUpdate({ id: booking.id }, booking, { upsert: true }).catch(() => {});
 
     // 1. Email to Admin
     try {
@@ -968,7 +1095,8 @@ app.post('/api/bookings/confirm-option', async (req, res) => {
   if (action === 'decline') {
     booking.status = 'cancelled';
     booking.adminDecisionNote = 'Créneaux proposés refusés par la cliente.';
-    writeJsonSafe(STUDIO_FILE, studio);
+    saveStudio(studio);
+    BookingModel.findOneAndUpdate({ id: booking.id }, booking, { upsert: true }).catch(() => {});
 
     // Email to Admin
     try {
@@ -1164,7 +1292,8 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
   };
 
   studio.bookings[idx] = updated;
-  writeJsonSafe(STUDIO_FILE, studio);
+  saveStudio(studio);
+  BookingModel.findOneAndUpdate({ id: updated.id }, updated, { upsert: true }).catch(() => {});
 
   let emailNotification = null;
 
@@ -1271,7 +1400,8 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/bookings/:id', requireAdmin, (req, res) => {
   const studio = loadStudio();
   studio.bookings = (studio.bookings || []).filter((b) => b.id !== req.params.id);
-  writeJsonSafe(STUDIO_FILE, studio);
+  saveStudio(studio);
+  BookingModel.deleteOne({ id: req.params.id }).catch(() => {});
   res.json({ studio: buildAdminStudio(studio) });
 });
 
