@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, Check, Clock, Copy, Instagram, Mail, ShieldCheck } from 'lucide-react';
+import { Calendar, Check, ChevronLeft, ChevronRight, Clock, Copy, ShieldCheck } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
 import type { BookingRequest, BookingVariant, ServiceCategory } from '../types/studio';
 import {
@@ -8,10 +8,7 @@ import {
   formatFrenchDate,
   getDayAvailability,
 } from '../utils/bookingLogic';
-import {
-  buildBookingMailtoUrl,
-  type ServerEmailNotification,
-} from '../utils/emailDispatch';
+import { optimizeCloudinaryUrl } from '../utils/cloudinary';
 
 interface BookingSectionProps {
   preselectedServiceId: string | null;
@@ -35,6 +32,9 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
   const activeServices = data.services.filter((s) => s.active);
   const activeAddons = data.addons.filter((a) => a.active);
   const { bookingRules } = data.config;
+
+  // Wizard Step: 1 = Prestation/Formule, 2 = Date & Heure, 3 = Coordonnées & Confirmation
+  const [currentStep, setCurrentStep] = useState<number>(1);
 
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory>('extensions');
   const [selectedServiceId, setSelectedServiceId] = useState<string>(
@@ -61,7 +61,6 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState<BookingRequest | null>(null);
-  const [emailStatus, setEmailStatus] = useState<ServerEmailNotification | null>(null);
   const [copied, setCopied] = useState(false);
 
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -81,6 +80,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
       }
       setSelectedAddonIds([]);
       setContraindicationsConfirmed(false);
+      setCurrentStep(1);
     }
   }, [preselectedServiceId, preselectedVariant, selectionTick]);
 
@@ -105,38 +105,53 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     }
   }, [dayAvailability, preferredTime]);
 
-  const categoryServices = activeServices.filter((s) => s.category === selectedCategory);
-  const currentService =
-    activeServices.find((s) => s.id === selectedServiceId) ||
-    categoryServices[0] ||
-    activeServices[0];
-
-  const availableAddons = activeAddons.filter(
-    (addon) => currentService && addon.applicableCategories.includes(currentService.category)
+  const currentService = useMemo(
+    () => activeServices.find((s) => s.id === selectedServiceId) || activeServices[0],
+    [activeServices, selectedServiceId]
   );
-  const chosenAddons = availableAddons.filter((a) => selectedAddonIds.includes(a.id));
 
-  const pricing = currentService
-    ? calculateBookingTotal(
-        currentService,
-        variant,
-        chosenAddons,
-        preferredDate,
-        preferredTime,
-        bookingRules
-      )
-    : null;
+  const categoryServices = useMemo(
+    () => activeServices.filter((s) => s.category === selectedCategory),
+    [activeServices, selectedCategory]
+  );
+
+  const availableAddons = useMemo(
+    () =>
+      activeAddons.filter(
+        (addon) => currentService && addon.applicableCategories.includes(currentService.category)
+      ),
+    [activeAddons, currentService]
+  );
+
+  const chosenAddons = useMemo(
+    () => availableAddons.filter((a) => selectedAddonIds.includes(a.id)),
+    [availableAddons, selectedAddonIds]
+  );
+
+  const pricing = useMemo(() => {
+    if (!currentService) return null;
+    return calculateBookingTotal(
+      currentService,
+      variant,
+      chosenAddons,
+      preferredDate,
+      preferredTime,
+      bookingRules
+    );
+  }, [currentService, variant, chosenAddons, preferredDate, preferredTime, bookingRules]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
-    if ('closedBy' in HTMLDialogElement.prototype) return;
-
     const isOutside = (e: PointerEvent) => {
-      const r = dialog.getBoundingClientRect();
-      return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
     };
-
     let pressedOutside = false;
     const onDown = (e: PointerEvent) => {
       pressedOutside = isOutside(e);
@@ -171,6 +186,52 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     );
   };
 
+  // Step Navigation Handlers
+  const goToNextStep = () => {
+    setErrorMessage('');
+    if (currentStep === 1) {
+      if (!currentService) {
+        setErrorMessage('Veuillez choisir une prestation.');
+        return;
+      }
+      setCurrentStep(2);
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    } else if (currentStep === 2) {
+      if (!dayAvailability.isDayOpen) {
+        setErrorMessage(
+          dayAvailability.dayReason || 'Ce jour est fermé. Merci de choisir une autre date.'
+        );
+        return;
+      }
+      if (dayAvailability.flexibleHours) {
+        if (!/^\d{2}:\d{2}$/.test(preferredTime)) {
+          setErrorMessage('Veuillez indiquer une heure souhaitée.');
+          return;
+        }
+        if (dayAvailability.unavailableTimes.includes(preferredTime)) {
+          setErrorMessage('Cette heure est déjà prise. Merci d’en choisir une autre.');
+          return;
+        }
+      } else {
+        const slotAvailable = dayAvailability.slots.some(
+          (s) => s.time === preferredTime && s.available
+        );
+        if (!slotAvailable) {
+          setErrorMessage('Ce créneau est complet. Veuillez sélectionner un horaire disponible.');
+          return;
+        }
+      }
+      setCurrentStep(3);
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    }
+  };
+
+  const goToPrevStep = () => {
+    setErrorMessage('');
+    setCurrentStep((prev) => Math.max(1, prev - 1));
+    window.scrollTo({ top: 180, behavior: 'smooth' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -186,25 +247,6 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
         dayAvailability.dayReason || 'Aucun créneau disponible à cette date. Merci d’en choisir une autre.'
       );
       return;
-    }
-
-    if (dayAvailability.flexibleHours) {
-      if (!/^\d{2}:\d{2}$/.test(preferredTime)) {
-        setErrorMessage('Veuillez indiquer votre heure souhaitée.');
-        return;
-      }
-      if (dayAvailability.unavailableTimes.includes(preferredTime)) {
-        setErrorMessage('Cette heure est déjà prise ou bloquée ce jour-là. Merci d’en choisir une autre.');
-        return;
-      }
-    } else {
-      const chosenSlotAvailable = dayAvailability.slots.some(
-        (s) => s.time === preferredTime && s.available
-      );
-      if (!chosenSlotAvailable) {
-        setErrorMessage('Ce créneau n’est plus disponible. Merci de choisir un autre horaire.');
-        return;
-      }
     }
 
     if (!clientName.trim() || !clientPhone.trim() || !clientEmail.trim()) {
@@ -238,7 +280,6 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
       });
 
       setConfirmedBooking(response.booking);
-      setEmailStatus(response.emailNotification);
       setCopied(false);
       dialogRef.current?.showModal();
     } catch (err) {
@@ -268,714 +309,721 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     <section
       id="reservation"
       aria-labelledby="reservation-heading"
-      className="surface-paper border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
+      className="surface-paper border-b border-stone/70 px-4 py-10 sm:px-6 sm:py-16"
     >
       <div className="mx-auto max-w-3xl">
+        {/* En-tête */}
         <div className="text-center">
           <p className="text-[11px] font-medium tracking-[0.24em] text-taupe uppercase">
-            Prise de rendez-vous en ligne
+            Réservation en ligne
           </p>
-          <h2 id="reservation-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-5xl">
+          <h2 id="reservation-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-4xl">
             Réserver votre créneau
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-xs leading-relaxed text-taupe sm:text-sm">
-            Choisissez un créneau disponible. Votre demande est transmise au studio, puis vous
-            recevez votre confirmation définitive par e-mail dès validation.
+          <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-taupe sm:text-sm">
+            Réservation intuitive et fluide étape par étape.
           </p>
+        </div>
+
+        {/* Stepper épuré et carré — Style du site */}
+        <div className="mt-8 mb-8 border border-charcoal/15 bg-white p-3 sm:p-4">
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <button
+              type="button"
+              onClick={() => setCurrentStep(1)}
+              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+                currentStep === 1
+                  ? 'border-charcoal text-charcoal font-semibold'
+                  : currentStep > 1
+                    ? 'border-charcoal/40 text-charcoal'
+                    : 'border-transparent text-taupe'
+              }`}
+            >
+              <span className="text-[10px] tracking-widest uppercase">Étape 1</span>
+              <span className="font-serif text-sm sm:text-base">Prestation</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (currentService) setCurrentStep(2);
+              }}
+              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+                currentStep === 2
+                  ? 'border-charcoal text-charcoal font-semibold'
+                  : currentStep > 2
+                    ? 'border-charcoal/40 text-charcoal'
+                    : 'border-transparent text-taupe'
+              }`}
+            >
+              <span className="text-[10px] tracking-widest uppercase">Étape 2</span>
+              <span className="font-serif text-sm sm:text-base">Date & Heure</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (currentService && dayAvailability.isDayOpen) setCurrentStep(3);
+              }}
+              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+                currentStep === 3
+                  ? 'border-charcoal text-charcoal font-semibold'
+                  : 'border-transparent text-taupe'
+              }`}
+            >
+              <span className="text-[10px] tracking-widest uppercase">Étape 3</span>
+              <span className="font-serif text-sm sm:text-base">Coordonnées</span>
+            </button>
+          </div>
         </div>
 
         <form
           onSubmit={handleSubmit}
           aria-labelledby="reservation-heading"
-          className="mt-10 space-y-8 border border-charcoal/15 bg-white p-5 shadow-[0_24px_60px_-30px_rgba(20,19,17,0.14)] sm:p-10"
+          className="border border-charcoal/15 bg-white p-5 shadow-[0_24px_60px_-30px_rgba(20,19,17,0.14)] sm:p-10"
         >
-          {/* ÉTAPE 1 : CATÉGORIE & PRESTATION */}
-          <fieldset className="space-y-4 border-b border-stone/60 pb-7">
-            <legend className="font-serif text-2xl text-charcoal">
-              1. Prestation souhaitée
-            </legend>
+          {errorMessage && (
+            <p role="alert" className="mb-6 border border-red-800/30 bg-red-50 px-4 py-3 text-xs text-red-900">
+              {errorMessage}
+            </p>
+          )}
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {(['extensions', 'rehaussement', 'blanchiment', 'depose'] as ServiceCategory[]).map(
-                (cat) => {
-                  const hasItems = activeServices.some((s) => s.category === cat);
-                  if (!hasItems) return null;
-                  const active = selectedCategory === cat;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => handleCategoryChange(cat)}
-                      className={`min-h-[48px] border px-3 py-2 text-xs font-medium tracking-wider uppercase transition-colors ${
-                        active
-                          ? 'border-charcoal bg-charcoal text-ivory'
-                          : 'border-stone bg-paper text-charcoal hover:border-charcoal'
-                      }`}
-                    >
-                      {CATEGORY_LABELS[cat]}
-                    </button>
-                  );
-                }
-              )}
-            </div>
+          {/* ========================================================= */}
+          {/* ÉTAPE 1 : PRESTATION & FORMULE                            */}
+          {/* ========================================================= */}
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <div className="border-b border-charcoal/15 pb-3">
+                <p className="text-[10px] tracking-widest uppercase text-taupe">Étape 1 sur 3</p>
+                <h3 className="font-serif text-2xl text-charcoal sm:text-3xl">
+                  Votre prestation &amp; formule
+                </h3>
+              </div>
 
-            <div className="space-y-1.5">
-              <label
-                htmlFor="booking-service"
-                className="block text-xs font-medium tracking-wider text-taupe uppercase"
-              >
-                Prestation précise
-              </label>
-              <select
-                id="booking-service"
-                name="serviceId"
-                value={currentService?.id || ''}
-                onChange={(e) => {
-                  setSelectedServiceId(e.target.value);
-                  setContraindicationsConfirmed(false);
-                }}
-                className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-              >
-                {categoryServices.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} — {s.fullPrice} €
-                    {s.refillPrice != null
-                      ? ` (${s.refillLabel || 'Option'} : ${s.refillPrice} €)`
-                      : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {currentService && currentService.refillPrice != null && (
-              <div className="space-y-2">
-                <span className="block text-xs font-medium tracking-wider text-taupe uppercase">
-                  Formule
-                </span>
-                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  <label className="flex min-h-[50px] cursor-pointer items-center justify-between border border-stone px-4 py-3 has-[:checked]:border-charcoal has-[:checked]:bg-ivory">
-                    <span className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="variant"
-                        value="full"
-                        checked={variant === 'full'}
-                        onChange={() => setVariant('full')}
-                        className="h-4 w-4 accent-charcoal"
-                      />
-                      <span className="text-sm font-medium text-charcoal">
-                        {currentService.fullLabel || 'Pose complète'}
-                      </span>
-                    </span>
-                    <span className="font-serif text-xl text-charcoal">
-                      {currentService.fullPrice} €
-                    </span>
-                  </label>
-
-                  <label className="flex min-h-[50px] cursor-pointer items-center justify-between border border-stone px-4 py-3 has-[:checked]:border-charcoal has-[:checked]:bg-ivory">
-                    <span className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name="variant"
-                        value={currentService.category === 'rehaussement' ? 'tint' : 'refill'}
-                        checked={variant === 'refill' || variant === 'tint'}
-                        onChange={() =>
-                          setVariant(currentService.category === 'rehaussement' ? 'tint' : 'refill')
-                        }
-                        className="h-4 w-4 accent-charcoal"
-                      />
-                      <span className="text-sm font-medium text-charcoal">
-                        {currentService.refillLabel || 'Remplissage 3 semaines'}
-                      </span>
-                    </span>
-                    <span className="font-serif text-xl text-charcoal">
-                      {currentService.refillPrice} €
-                    </span>
-                  </label>
-                </div>
-
-                {currentService.category === 'extensions' && variant === 'refill' && (
-                  <p className="border-l-2 border-charcoal bg-ivory px-3 py-2 text-xs text-charcoal">
-                    Rappel : {bookingRules.refillPolicyNote}
-                  </p>
+              {/* Sélecteur de catégorie rapide */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(['extensions', 'rehaussement', 'blanchiment', 'depose'] as ServiceCategory[]).map(
+                  (cat) => {
+                    const hasItems = activeServices.some((s) => s.category === cat);
+                    if (!hasItems) return null;
+                    const active = selectedCategory === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => handleCategoryChange(cat)}
+                        className={`min-h-[44px] border px-3 py-2 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer ${
+                          active
+                            ? 'border-charcoal bg-charcoal text-ivory'
+                            : 'border-stone bg-paper text-charcoal hover:border-charcoal'
+                        }`}
+                      >
+                        {CATEGORY_LABELS[cat]}
+                      </button>
+                    );
+                  }
                 )}
               </div>
-            )}
 
-            {availableAddons.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <span className="block text-xs font-medium tracking-wider text-taupe uppercase">
-                  Options & Finitions (facultatif)
-                </span>
-                <div className="space-y-2">
-                  {availableAddons.map((addon) => (
-                    <label
-                      key={addon.id}
-                      className="flex min-h-[48px] cursor-pointer items-center justify-between gap-3 border border-stone/80 px-3.5 py-2.5 transition-colors hover:border-charcoal"
-                    >
-                      <span className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedAddonIds.includes(addon.id)}
-                          onChange={() => toggleAddon(addon.id)}
-                          className="mt-1 h-4 w-4 accent-charcoal"
-                        />
-                        <span>
-                          <span className="block text-sm font-medium text-charcoal">
-                            {addon.name}
-                          </span>
-                          <span className="block text-xs text-taupe">{addon.description}</span>
+              {/* Carte résumé de la prestation active */}
+              {currentService && (
+                <div className="border border-charcoal/15 bg-ivory/40 p-4 sm:p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    {currentService.imageUrl && (
+                      <img
+                        src={optimizeCloudinaryUrl(currentService.imageUrl, 240)}
+                        alt={currentService.name}
+                        className="h-20 w-20 border border-charcoal/15 object-cover shrink-0"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h4 className="font-serif text-xl text-charcoal sm:text-2xl">
+                          {currentService.name}
+                        </h4>
+                        <span className="font-serif text-2xl text-charcoal">
+                          {currentService.fullPrice}€
                         </span>
-                      </span>
-                      <span className="shrink-0 text-xs font-medium text-charcoal uppercase">
-                        {addon.price > 0 ? `+${addon.price} €` : addon.priceLabel || 'Gratuit'}
-                      </span>
-                    </label>
-                  ))}
+                      </div>
+                      {currentService.description && (
+                        <p className="mt-1 text-xs text-taupe leading-relaxed">
+                          {currentService.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
-          </fieldset>
-
-          {/* ÉTAPE 2 : DATE & HEURE SOUHAITÉE */}
-          <fieldset className="space-y-5 border-b border-stone/60 pb-7">
-            <legend className="font-serif text-2xl text-charcoal">
-              2. Date et heure souhaitée
-            </legend>
-
-            <p className="text-xs leading-relaxed text-taupe">
-              {dayAvailability.flexibleHours
-                ? 'Créneaux flexibles : choisissez votre date et l’heure qui vous arrange.'
-                : 'Choisissez votre date et l’un des créneaux proposés.'}{' '}
-              {bookingRules.supplementAmount > 0 && (
-                <>
-                  Supplément de <strong className="text-charcoal">{bookingRules.supplementAmount} €</strong>{' '}
-                  {bookingRules.lateHourThreshold < 24
-                    ? `à partir de ${bookingRules.lateHourThreshold}h00, `
-                    : ''}
-                  le dimanche et les jours fériés.
-                </>
               )}
-            </p>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+              {/* Choix de la prestation précise */}
               <div className="space-y-1.5">
                 <label
-                  htmlFor="booking-date"
-                  className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-taupe uppercase"
+                  htmlFor="booking-service"
+                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
                 >
-                  <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Date souhaitée</span>
+                  Changer de prestation
                 </label>
-                <input
-                  id="booking-date"
-                  name="preferredDate"
-                  type="date"
-                  min={new Date().toISOString().split('T')[0]}
-                  value={preferredDate}
+                <select
+                  id="booking-service"
+                  name="serviceId"
+                  value={currentService?.id || ''}
                   onChange={(e) => {
-                    setPreferredDate(e.target.value);
-                    setErrorMessage('');
+                    setSelectedServiceId(e.target.value);
+                    setContraindicationsConfirmed(false);
                   }}
-                  required
                   className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-                />
-                <span className="block text-[11px] text-taupe capitalize">
-                  {formatFrenchDate(preferredDate)}
-                </span>
+                >
+                  {categoryServices.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.fullPrice} €
+                      {s.refillPrice != null
+                        ? ` (${s.refillLabel || 'Remplissage'} : ${s.refillPrice} €)`
+                        : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {dayAvailability.isDayOpen && dayAvailability.flexibleHours && (
+              {/* Formules si disponible */}
+              {currentService && currentService.refillPrice != null && (
+                <div className="space-y-2 pt-2">
+                  <span className="block text-xs font-medium tracking-wider text-taupe uppercase">
+                    Choisir votre formule
+                  </span>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <label className="flex min-h-[50px] cursor-pointer items-center justify-between border border-stone px-4 py-3 has-[:checked]:border-charcoal has-[:checked]:bg-ivory">
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="variant"
+                          value="full"
+                          checked={variant === 'full'}
+                          onChange={() => setVariant('full')}
+                          className="h-4 w-4 accent-charcoal"
+                        />
+                        <span className="text-sm font-medium text-charcoal">
+                          {currentService.fullLabel || 'Pose complète'}
+                        </span>
+                      </span>
+                      <span className="font-serif text-xl text-charcoal">
+                        {currentService.fullPrice} €
+                      </span>
+                    </label>
+
+                    <label className="flex min-h-[50px] cursor-pointer items-center justify-between border border-stone px-4 py-3 has-[:checked]:border-charcoal has-[:checked]:bg-ivory">
+                      <span className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="variant"
+                          value={currentService.category === 'rehaussement' ? 'tint' : 'refill'}
+                          checked={variant === 'refill' || variant === 'tint'}
+                          onChange={() =>
+                            setVariant(currentService.category === 'rehaussement' ? 'tint' : 'refill')
+                          }
+                          className="h-4 w-4 accent-charcoal"
+                        />
+                        <span className="text-sm font-medium text-charcoal">
+                          {currentService.refillLabel || 'Remplissage 3 semaines'}
+                        </span>
+                      </span>
+                      <span className="font-serif text-xl text-charcoal">
+                        {currentService.refillPrice} €
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Options & Finitions */}
+              {availableAddons.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <span className="block text-xs font-medium tracking-wider text-taupe uppercase">
+                    Options supplémentaires (facultatif)
+                  </span>
+                  <div className="space-y-2">
+                    {availableAddons.map((addon) => (
+                      <label
+                        key={addon.id}
+                        className="flex min-h-[48px] cursor-pointer items-center justify-between gap-3 border border-stone/80 px-3.5 py-2.5 transition-colors hover:border-charcoal"
+                      >
+                        <span className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedAddonIds.includes(addon.id)}
+                            onChange={() => toggleAddon(addon.id)}
+                            className="mt-1 h-4 w-4 accent-charcoal"
+                          />
+                          <span>
+                            <span className="block text-sm font-medium text-charcoal">
+                              {addon.name}
+                            </span>
+                            <span className="block text-xs text-taupe">{addon.description}</span>
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs font-medium text-charcoal uppercase">
+                          {addon.price > 0 ? `+${addon.price} €` : addon.priceLabel || 'Gratuit'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bouton Suivant Étape 1 */}
+              <div className="pt-4 border-t border-charcoal/15 flex justify-end">
+                <button
+                  type="button"
+                  onClick={goToNextStep}
+                  className="inline-flex min-h-[48px] items-center gap-2 border border-charcoal bg-charcoal px-6 py-2.5 text-xs font-medium tracking-widest uppercase text-ivory hover:bg-silk transition-colors cursor-pointer"
+                >
+                  <span>Choisir la date &amp; l'heure</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* ÉTAPE 2 : DATE & HEURE                                    */}
+          {/* ========================================================= */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <div className="border-b border-charcoal/15 pb-3">
+                <p className="text-[10px] tracking-widest uppercase text-taupe">Étape 2 sur 3</p>
+                <h3 className="font-serif text-2xl text-charcoal sm:text-3xl">
+                  Date &amp; heure souhaitée
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
                 <div className="space-y-1.5">
                   <label
-                    htmlFor="booking-time-flexible"
+                    htmlFor="booking-date"
                     className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-taupe uppercase"
                   >
-                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span>Heure souhaitée</span>
+                    <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>Date souhaitée</span>
                   </label>
                   <input
-                    id="booking-time-flexible"
-                    name="preferredTime"
-                    type="time"
-                    value={preferredTime}
+                    id="booking-date"
+                    name="preferredDate"
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={preferredDate}
                     onChange={(e) => {
-                      setPreferredTime(e.target.value);
+                      setPreferredDate(e.target.value);
                       setErrorMessage('');
                     }}
                     required
                     className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
                   />
-                  {dayAvailability.unavailableTimes.includes(preferredTime) ? (
-                    <span className="block text-[11px] font-medium text-red-800">
-                      Cette heure est déjà prise ce jour-là, choisissez un autre horaire.
-                    </span>
-                  ) : (
-                    <span className="block text-[11px] text-taupe">
-                      {pricing?.isSupplementApplied
-                        ? `+${pricing.supplementPrice} € (${pricing.supplementReason})`
-                        : 'Tarif normal sur cet horaire'}
-                    </span>
+                  <span className="block text-[11px] text-taupe capitalize">
+                    {formatFrenchDate(preferredDate)}
+                  </span>
+                </div>
+
+                {dayAvailability.isDayOpen && dayAvailability.flexibleHours && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="booking-time-flexible"
+                      className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-taupe uppercase"
+                    >
+                      <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span>Heure souhaitée</span>
+                    </label>
+                    <input
+                      id="booking-time-flexible"
+                      name="preferredTime"
+                      type="time"
+                      value={preferredTime}
+                      onChange={(e) => {
+                        setPreferredTime(e.target.value);
+                        setErrorMessage('');
+                      }}
+                      required
+                      className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                    />
+                    {dayAvailability.unavailableTimes.includes(preferredTime) ? (
+                      <span className="block text-[11px] font-medium text-red-800">
+                        Cette heure est déjà prise ce jour-là, choisissez un autre horaire.
+                      </span>
+                    ) : (
+                      <span className="block text-[11px] text-taupe">
+                        {pricing?.isSupplementApplied
+                          ? `+${pricing.supplementPrice} € (${pricing.supplementReason})`
+                          : 'Tarif normal sur cet horaire'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {!dayAvailability.isDayOpen ? (
+                <p role="status" className="border border-red-800/30 bg-red-50 px-4 py-3 text-xs text-red-900">
+                  {dayAvailability.dayReason}
+                </p>
+              ) : !dayAvailability.flexibleHours ? (
+                <div className="space-y-5">
+                  {standardAvailable.length > 0 && (
+                    <div className="space-y-2.5">
+                      <span className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-taupe uppercase">
+                        <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Créneaux disponibles</span>
+                      </span>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                        {standardAvailable.map((slot) => {
+                          const selected = preferredTime === slot.time;
+                          return (
+                            <label
+                              key={slot.time}
+                              className={`flex min-h-[48px] flex-col items-center justify-center border px-2 py-2 text-center transition-colors ${
+                                !slot.available
+                                  ? 'cursor-not-allowed border-stone/60 bg-ivory/70 text-taupe/60 line-through'
+                                  : selected
+                                    ? 'cursor-pointer border-charcoal bg-charcoal text-ivory'
+                                    : 'cursor-pointer border-stone bg-white text-charcoal hover:border-charcoal'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="preferredTime"
+                                value={slot.time}
+                                disabled={!slot.available}
+                                checked={selected}
+                                onChange={() => {
+                                  setPreferredTime(slot.time);
+                                  setErrorMessage('');
+                                }}
+                                className="visually-hidden"
+                              />
+                              <span className="text-sm font-medium">{slot.time}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {eveningAvailable.length > 0 && (
+                    <div className="space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-medium tracking-wider text-taupe uppercase">
+                          Créneaux en soirée (+{bookingRules.supplementAmount}€)
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {eveningAvailable.map((slot) => {
+                          const selected = preferredTime === slot.time;
+                          return (
+                            <label
+                              key={slot.time}
+                              className={`flex min-h-[48px] flex-col items-center justify-center border px-2 py-2 text-center transition-colors ${
+                                !slot.available
+                                  ? 'cursor-not-allowed border-stone/60 bg-ivory/70 text-taupe/60 line-through'
+                                  : selected
+                                    ? 'cursor-pointer border-charcoal bg-charcoal text-ivory'
+                                    : 'cursor-pointer border-amber-800/30 bg-amber-50/40 text-charcoal hover:border-charcoal'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="preferredTime"
+                                value={slot.time}
+                                disabled={!slot.available}
+                                checked={selected}
+                                onChange={() => {
+                                  setPreferredTime(slot.time);
+                                  setErrorMessage('');
+                                }}
+                                className="visually-hidden"
+                              />
+                              <span className="text-sm font-medium">{slot.time}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              ) : null}
 
-            {dayAvailability.isDayOpen &&
-              dayAvailability.flexibleHours &&
-              dayAvailability.unavailableTimes.length > 0 && (
-                <p className="border-l-2 border-stone bg-ivory px-3.5 py-2 text-xs text-charcoal">
-                  Déjà pris ou bloqué ce jour :{' '}
-                  <strong>{dayAvailability.unavailableTimes.join(', ')}</strong>
-                </p>
-              )}
-
-            {!dayAvailability.isDayOpen ? (
-              <p
-                role="status"
-                className="border border-red-800/30 bg-red-50 px-4 py-3 text-xs text-red-900"
-              >
-                {dayAvailability.dayReason}
-              </p>
-            ) : !dayAvailability.flexibleHours ? (
-              <div className="space-y-5">
-                {(() => {
-                  const [yr, mo, dy] = preferredDate.split('-').map(Number);
-                  const isSundayOrHoliday =
-                    Boolean(yr && mo && dy && new Date(yr, mo - 1, dy).getDay() === 0) ||
-                    bookingRules.holidays.includes(preferredDate);
-
-                  return (
-                    <>
-                      {standardAvailable.length > 0 && (
-                        <div className="space-y-2.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="flex items-center gap-1.5 text-xs font-medium tracking-wider text-taupe uppercase">
-                              <Clock className="h-3.5 w-3.5" aria-hidden="true" />
-                              <span>Créneaux en journée</span>
-                            </span>
-                            <span className="text-[11px] font-medium text-charcoal">
-                              {isSundayOrHoliday
-                                ? `Dimanche / Férié (+${bookingRules.supplementAmount} €)`
-                                : 'Tarif normal'}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                            {standardAvailable.map((slot) => {
-                              const selected = preferredTime === slot.time;
-                              return (
-                                <label
-                                  key={slot.time}
-                                  className={`flex min-h-[48px] flex-col items-center justify-center border px-2 py-2 text-center transition-colors ${
-                                    !slot.available
-                                      ? 'cursor-not-allowed border-stone/60 bg-ivory/70 text-taupe/60 line-through'
-                                      : selected
-                                        ? 'cursor-pointer border-charcoal bg-charcoal text-ivory'
-                                        : 'cursor-pointer border-stone bg-white text-charcoal hover:border-charcoal'
-                                  }`}
-                                >
-                                  <input
-                                    type="radio"
-                                    name="preferredTime"
-                                    value={slot.time}
-                                    disabled={!slot.available}
-                                    checked={selected}
-                                    onChange={() => {
-                                      setPreferredTime(slot.time);
-                                      setErrorMessage('');
-                                    }}
-                                    className="visually-hidden"
-                                  />
-                                  <span className="text-sm font-medium">{slot.time}</span>
-                                  {!slot.available && (
-                                    <span className="text-[10px]">Indisponible</span>
-                                  )}
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {eveningAvailable.length > 0 && (
-                        <div className="space-y-2.5">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-xs font-medium tracking-wider text-taupe uppercase">
-                              Créneaux en soirée (dès {bookingRules.lateHourThreshold}h00)
-                            </span>
-                            <span className="border border-amber-800/30 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-950">
-                              +{bookingRules.supplementAmount} €
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                            {eveningAvailable.map((slot) => {
-                              const selected = preferredTime === slot.time;
-                              return (
-                                <label
-                                  key={slot.time}
-                                  className={`flex min-h-[48px] flex-col items-center justify-center border px-2 py-2 text-center transition-colors ${
-                                    !slot.available
-                                      ? 'cursor-not-allowed border-stone/60 bg-ivory/70 text-taupe/60 line-through'
-                                      : selected
-                                        ? 'cursor-pointer border-charcoal bg-charcoal text-ivory'
-                                        : 'cursor-pointer border-amber-800/30 bg-amber-50/40 text-charcoal hover:border-charcoal'
-                                  }`}
-                                >
-                                  <input
-                                    type="radio"
-                                    name="preferredTime"
-                                    value={slot.time}
-                                    disabled={!slot.available}
-                                    checked={selected}
-                                    onChange={() => {
-                                      setPreferredTime(slot.time);
-                                      setErrorMessage('');
-                                    }}
-                                    className="visually-hidden"
-                                  />
-                                  <span className="text-sm font-medium">{slot.time}</span>
-                                  <span
-                                    className={`text-[10px] ${
-                                      !slot.available
-                                        ? ''
-                                        : selected
-                                          ? 'text-stone'
-                                          : 'text-amber-900'
-                                    }`}
-                                  >
-                                    {!slot.available
-                                      ? 'Indisponible'
-                                      : `+${bookingRules.supplementAmount} €`}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
-            ) : null}
-
-            {dayAvailability.isDayOpen && pricing?.isSupplementApplied && (
-              <p
-                role="status"
-                className="border border-amber-800/30 bg-amber-50/70 px-4 py-3 text-xs leading-relaxed text-charcoal"
-              >
-                Supplément appliqué (+{pricing.supplementPrice} €) :{' '}
-                <strong>{pricing.supplementReason}</strong>.
-              </p>
-            )}
-          </fieldset>
-
-          {/* ÉTAPE 3 : COORDONNÉES & CONTRE-INDICATIONS */}
-          <fieldset className="space-y-4">
-            <legend className="font-serif text-2xl text-charcoal">3. Vos coordonnées</legend>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="client-name"
-                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
+              {/* Boutons Retour / Suivant Étape 2 */}
+              <div className="pt-4 border-t border-charcoal/15 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={goToPrevStep}
+                  className="inline-flex min-h-[48px] items-center gap-1.5 border border-stone bg-white px-4 py-2.5 text-xs font-medium tracking-wider uppercase text-charcoal hover:border-charcoal transition-colors cursor-pointer"
                 >
-                  Prénom et Nom <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="client-name"
-                  name="clientName"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  value={clientName}
-                  onChange={(e) => {
-                    setClientName(e.target.value);
-                    setErrorMessage('');
-                  }}
-                  placeholder="Camille Laurent"
-                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-                />
-              </div>
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Retour</span>
+                </button>
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="client-phone"
-                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                <button
+                  type="button"
+                  onClick={goToNextStep}
+                  className="inline-flex min-h-[48px] items-center gap-2 border border-charcoal bg-charcoal px-6 py-2.5 text-xs font-medium tracking-widest uppercase text-ivory hover:bg-silk transition-colors cursor-pointer"
                 >
-                  Téléphone <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="client-phone"
-                  name="clientPhone"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  required
-                  value={clientPhone}
-                  onChange={(e) => {
-                    setClientPhone(e.target.value);
-                    setErrorMessage('');
-                  }}
-                  placeholder="06 12 34 56 78"
-                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-                />
+                  <span>Mes coordonnées</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
             </div>
+          )}
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="client-email"
-                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
-                >
-                  E-mail (pour la confirmation) <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="client-email"
-                  name="clientEmail"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  required
-                  value={clientEmail}
-                  onChange={(e) => {
-                    setClientEmail(e.target.value);
-                    setErrorMessage('');
-                  }}
-                  placeholder="camille@gmail.com"
-                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-                />
+          {/* ========================================================= */}
+          {/* ÉTAPE 3 : COORDONNÉES & VALIDATION                         */}
+          {/* ========================================================= */}
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <div className="border-b border-charcoal/15 pb-3">
+                <p className="text-[10px] tracking-widest uppercase text-taupe">Étape 3 sur 3</p>
+                <h3 className="font-serif text-2xl text-charcoal sm:text-3xl">
+                  Vos coordonnées &amp; confirmation
+                </h3>
               </div>
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="client-instagram"
-                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
-                >
-                  Pseudo Instagram (suivi rapide)
-                </label>
-                <input
-                  id="client-instagram"
-                  name="clientInstagram"
-                  type="text"
-                  autoCorrect="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  value={clientInstagram}
-                  onChange={(e) => setClientInstagram(e.target.value)}
-                  placeholder="@votrecompte"
-                  className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="client-notes"
-                className="block text-xs font-medium tracking-wider text-taupe uppercase"
-              >
-                Précisions ou demande de réajustement (facultatif)
-              </label>
-              <textarea
-                id="client-notes"
-                name="notes"
-                rows={3}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex. souplesse horaire, pose déjà présente d’un autre institut, précision sur le rendu souhaité..."
-                className="w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
-              />
-            </div>
-
-            {currentService?.category === 'blanchiment' && (
-              <label className="flex min-h-[52px] cursor-pointer items-start gap-3 border border-charcoal/30 bg-ivory p-4">
-                <input
-                  type="checkbox"
-                  checked={contraindicationsConfirmed}
-                  onChange={(e) => {
-                    setContraindicationsConfirmed(e.target.checked);
-                    setErrorMessage('');
-                  }}
-                  className="mt-1 h-4 w-4 shrink-0 accent-charcoal"
-                />
-                <span className="text-xs leading-relaxed text-charcoal">
-                  Je confirme ne présenter aucune contre-indication au blanchiment dentaire (pas de
-                  grossesse/allaitement, pas de composite, facette ou couronne sur dents visibles,
-                  pas de carie sur les incisives).
-                </span>
-              </label>
-            )}
-          </fieldset>
-
-          {/* RÉCAPITULATIF & VALIDATION */}
-          {pricing && currentService && (
-            <div className="border-t border-charcoal/20 bg-ivory/80 p-4 sm:p-6">
-              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-                <div className="space-y-1">
-                  <p className="text-xs font-medium tracking-wider text-taupe uppercase">
-                    Récapitulatif estimé
-                  </p>
-                  <p className="font-serif text-xl text-charcoal">
-                    {currentService.name} — {pricing.variantLabel}
-                  </p>
-                  <p className="text-xs text-taupe">
-                    {formatFrenchDate(preferredDate)} à {preferredTime || '—'}
-                    {pricing.isSupplementApplied
-                      ? ` · Supplément +${pricing.supplementPrice} € (${pricing.supplementReason})`
-                      : ''}
-                  </p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="client-name"
+                    className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                  >
+                    Prénom et Nom <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="client-name"
+                    name="clientName"
+                    type="text"
+                    autoComplete="name"
+                    required
+                    value={clientName}
+                    onChange={(e) => {
+                      setClientName(e.target.value);
+                      setErrorMessage('');
+                    }}
+                    placeholder="Camille Laurent"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  />
                 </div>
 
-                <div className="text-left sm:text-right">
-                  <span className="block text-[11px] tracking-wider text-taupe uppercase">
-                    Total estimé
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="client-phone"
+                    className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                  >
+                    Téléphone <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="client-phone"
+                    name="clientPhone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    required
+                    value={clientPhone}
+                    onChange={(e) => {
+                      setClientPhone(e.target.value);
+                      setErrorMessage('');
+                    }}
+                    placeholder="06 12 34 56 78"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="client-email"
+                    className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                  >
+                    E-mail (pour confirmation) <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="client-email"
+                    name="clientEmail"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    value={clientEmail}
+                    onChange={(e) => {
+                      setClientEmail(e.target.value);
+                      setErrorMessage('');
+                    }}
+                    placeholder="camille@gmail.com"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="client-instagram"
+                    className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                  >
+                    Pseudo Instagram (facultatif)
+                  </label>
+                  <input
+                    id="client-instagram"
+                    name="clientInstagram"
+                    type="text"
+                    value={clientInstagram}
+                    onChange={(e) => setClientInstagram(e.target.value)}
+                    placeholder="@votrecompte"
+                    className="min-h-[48px] w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="client-notes"
+                  className="block text-xs font-medium tracking-wider text-taupe uppercase"
+                >
+                  Précisions éventuelles (facultatif)
+                </label>
+                <textarea
+                  id="client-notes"
+                  name="notes"
+                  rows={2}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ex. souplesse horaire, pose extérieure déjà présente..."
+                  className="w-full border border-charcoal/30 bg-white px-3.5 py-2.5 text-charcoal"
+                />
+              </div>
+
+              {currentService?.category === 'blanchiment' && (
+                <label className="flex min-h-[52px] cursor-pointer items-start gap-3 border border-charcoal/30 bg-ivory p-4">
+                  <input
+                    type="checkbox"
+                    checked={contraindicationsConfirmed}
+                    onChange={(e) => {
+                      setContraindicationsConfirmed(e.target.checked);
+                      setErrorMessage('');
+                    }}
+                    className="mt-1 h-4 w-4 shrink-0 accent-charcoal"
+                  />
+                  <span className="text-xs leading-relaxed text-charcoal">
+                    Je confirme ne présenter aucune contre-indication au blanchiment dentaire.
                   </span>
-                  <span className="font-serif text-4xl text-charcoal">{pricing.totalPrice} €</span>
-                </div>
-              </div>
-
-              {errorMessage && (
-                <p role="alert" className="mt-4 border border-red-800/30 bg-red-50 px-3 py-2 text-xs text-red-900">
-                  {errorMessage}
-                </p>
+                </label>
               )}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 border border-charcoal bg-charcoal px-6 py-3.5 text-xs font-semibold tracking-[0.2em] text-ivory uppercase transition-colors hover:bg-silk disabled:opacity-60"
-              >
-                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                <span>
-                  {isSubmitting
-                    ? 'Transmission de votre demande...'
-                    : 'Envoyer ma demande de rendez-vous'}
-                </span>
-              </button>
+              {/* Récapitulatif Final */}
+              {pricing && currentService && (
+                <div className="border border-charcoal/20 bg-ivory/80 p-4 sm:p-5">
+                  <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                    <div>
+                      <p className="text-[10px] tracking-widest uppercase text-taupe">Récapitulatif</p>
+                      <p className="font-serif text-lg text-charcoal sm:text-xl">
+                        {currentService.name} — {pricing.variantLabel}
+                      </p>
+                      <p className="text-xs text-taupe">
+                        {formatFrenchDate(preferredDate)} à {preferredTime}
+                        {pricing.isSupplementApplied
+                          ? ` · Supplément +${pricing.supplementPrice} € (${pricing.supplementReason})`
+                          : ''}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <span className="block text-[10px] tracking-wider uppercase text-taupe">Total estimé</span>
+                      <span className="font-serif text-3xl font-normal text-charcoal">{pricing.totalPrice} €</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Boutons Retour / Confirmer Étape 3 */}
+              <div className="pt-4 border-t border-charcoal/15 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={goToPrevStep}
+                  className="inline-flex min-h-[48px] items-center gap-1.5 border border-stone bg-white px-4 py-2.5 text-xs font-medium tracking-wider uppercase text-charcoal hover:border-charcoal transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Retour</span>
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex min-h-[48px] flex-1 items-center justify-center gap-2 border border-charcoal bg-charcoal px-6 py-3 text-xs font-semibold tracking-[0.2em] text-ivory uppercase transition-colors hover:bg-silk disabled:opacity-60 cursor-pointer sm:flex-none"
+                >
+                  <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                  <span>{isSubmitting ? 'Envoi en cours...' : 'Confirmer la réservation'}</span>
+                </button>
+              </div>
             </div>
           )}
         </form>
-      </div>
 
-      {/* Native <dialog> confirmation */}
-      <dialog ref={dialogRef} aria-labelledby="booking-confirm-title" closedby="any">
-        {confirmedBooking && (
-          <div className="p-6 sm:p-8">
-            <div className="flex items-center justify-between border-b border-stone pb-4">
-              <span className="text-[11px] font-medium tracking-[0.2em] text-taupe uppercase">
-                En attente de validation · {confirmedBooking.reference}
-              </span>
-              <form method="dialog">
-                <button
-                  type="submit"
-                  value="close"
-                  className="min-h-[44px] px-2 text-xs tracking-wider text-taupe uppercase hover:text-charcoal"
-                >
-                  Fermer
-                </button>
-              </form>
-            </div>
-
-            <h3 id="booking-confirm-title" className="mt-5 font-serif text-3xl text-charcoal">
-              Demande transmise au studio
-            </h3>
-            <p className="mt-2 text-xs leading-relaxed text-taupe sm:text-sm">
-              Votre créneau est soumis à la validation de l’administrateur. Dès qu’il est validé,
-              vous recevez un e-mail de confirmation sur{' '}
-              <strong className="text-charcoal">{confirmedBooking.clientEmail}</strong>.
-            </p>
-
-            <dl className="mt-5 space-y-2 border border-stone bg-ivory p-4 text-xs">
-              <div className="flex justify-between gap-4">
-                <dt className="text-taupe">Prestation</dt>
-                <dd className="text-right font-medium text-charcoal">
-                  {confirmedBooking.serviceName} ({confirmedBooking.variantLabel})
-                </dd>
-              </div>
-              {confirmedBooking.addonNames.length > 0 && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-taupe">Options</dt>
-                  <dd className="text-right text-charcoal">
-                    {confirmedBooking.addonNames.join(', ')}
-                  </dd>
+        {/* Modal Confirmation */}
+        <dialog
+          ref={dialogRef}
+          aria-labelledby="confirmed-modal-title"
+          className="m-auto w-[92vw] max-w-xl border border-charcoal/30 bg-paper p-0 text-charcoal shadow-2xl backdrop:bg-charcoal/60 backdrop:backdrop-blur-xs"
+        >
+          {confirmedBooking && (
+            <div className="p-6 sm:p-8">
+              <div className="flex items-center gap-3 text-stone-900">
+                <div className="flex h-10 w-10 items-center justify-center border border-charcoal bg-charcoal text-ivory">
+                  <Check className="h-5 w-5" aria-hidden="true" />
                 </div>
-              )}
-              <div className="flex justify-between gap-4">
-                <dt className="text-taupe">Créneau demandé</dt>
-                <dd className="text-right text-charcoal">
-                  {formatFrenchDate(confirmedBooking.preferredDate)} à{' '}
-                  {confirmedBooking.preferredTime}
-                </dd>
+                <div>
+                  <h3 id="confirmed-modal-title" className="font-serif text-2xl">
+                    Demande transmise avec succès
+                  </h3>
+                  <p className="text-xs text-taupe">Référence : {confirmedBooking.id}</p>
+                </div>
               </div>
-              <div className="flex justify-between gap-4 border-t border-stone/70 pt-2">
-                <dt className="font-medium text-charcoal">Total estimé</dt>
-                <dd className="font-serif text-xl text-charcoal">
-                  {confirmedBooking.totalPrice} €
-                </dd>
+
+              <div className="mt-6 space-y-3 border-y border-stone/60 py-4 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-taupe">Prestation :</span>
+                  <span className="font-medium text-right">
+                    {confirmedBooking.serviceName} ({confirmedBooking.variantLabel})
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-taupe">Date &amp; heure :</span>
+                  <span className="font-medium">
+                    {formatFrenchDate(confirmedBooking.preferredDate)} à {confirmedBooking.preferredTime}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-taupe">Nom de cliente :</span>
+                  <span className="font-medium">{confirmedBooking.clientName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-taupe">Total estimé :</span>
+                  <span className="font-serif text-base font-bold">
+                    {confirmedBooking.totalPrice} €
+                  </span>
+                </div>
               </div>
-            </dl>
 
-            {emailStatus && (
-              <p
-                role="status"
-                className={`mt-4 border px-3.5 py-2.5 text-xs leading-relaxed ${
-                  emailStatus.delivered
-                    ? 'border-emerald-800/30 bg-emerald-50 text-emerald-950'
-                    : 'border-amber-800/30 bg-amber-50 text-amber-950'
-                }`}
-              >
-                {emailStatus.message}
-              </p>
-            )}
-
-            <div className="mt-6 flex flex-col gap-2.5">
-              <div className="flex flex-col gap-2.5 sm:flex-row">
+              <div className="mt-6 flex flex-col gap-2.5 sm:flex-row">
                 <button
                   type="button"
                   onClick={handleCopySummary}
-                  className="flex min-h-[48px] flex-1 items-center justify-center gap-2 border border-charcoal px-4 py-2.5 text-xs font-medium tracking-wider text-charcoal uppercase transition-colors hover:bg-ivory"
+                  className="flex min-h-[44px] flex-1 items-center justify-center gap-2 border border-charcoal px-4 py-2 text-xs font-medium uppercase tracking-wider hover:bg-ivory"
                 >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4" aria-hidden="true" />
-                      <span>Récapitulatif copié</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" aria-hidden="true" />
-                      <span>Copier le récapitulatif</span>
-                    </>
-                  )}
+                  <Copy className="h-4 w-4" aria-hidden="true" />
+                  <span>{copied ? 'Copié dans le presse-papier !' : 'Copier le récapitulatif'}</span>
                 </button>
-
-                <a
-                  href={data.config.instagramUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex min-h-[48px] flex-1 items-center justify-center gap-2 border border-charcoal bg-charcoal px-4 py-2.5 text-xs font-medium tracking-wider text-ivory uppercase transition-colors hover:bg-silk"
+                <button
+                  type="button"
+                  onClick={() => dialogRef.current?.close()}
+                  className="flex min-h-[44px] items-center justify-center border border-charcoal bg-charcoal px-5 py-2 text-xs font-medium uppercase tracking-wider text-ivory hover:bg-silk"
                 >
-                  <Instagram className="h-4 w-4" aria-hidden="true" />
-                  <span>Ouvrir {data.config.handle}</span>
-                </a>
+                  Fermer
+                </button>
               </div>
-
-              {data.config.contactEmail && (
-                <a
-                  href={buildBookingMailtoUrl(confirmedBooking, data.config.contactEmail)}
-                  className="flex min-h-[46px] w-full items-center justify-center gap-2 border border-stone bg-white px-4 py-2 text-xs font-medium tracking-wider text-charcoal uppercase transition-colors hover:border-charcoal"
-                >
-                  <Mail className="h-4 w-4" aria-hidden="true" />
-                  <span>Doubler par e-mail ({data.config.contactEmail})</span>
-                </a>
-              )}
             </div>
-          </div>
-        )}
-      </dialog>
+          )}
+        </dialog>
+      </div>
     </section>
   );
 };
