@@ -195,7 +195,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
         return;
       }
       setCurrentStep(2);
-      window.scrollTo({ top: 180, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (currentStep === 2) {
       if (!dayAvailability.isDayOpen) {
         setErrorMessage(
@@ -222,14 +222,19 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
         }
       }
       setCurrentStep(3);
-      window.scrollTo({ top: 180, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const goToPrevStep = () => {
     setErrorMessage('');
     setCurrentStep((prev) => Math.max(1, prev - 1));
-    window.scrollTo({ top: 180, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -309,7 +314,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     <section
       id="reservation"
       aria-labelledby="reservation-heading"
-      className="surface-paper border-b border-stone/70 px-4 py-10 sm:px-6 sm:py-16"
+      className="surface-paper border-b border-stone/70 px-4 py-4 sm:px-6 sm:py-8"
     >
       <div className="mx-auto max-w-3xl">
         {/* En-tête */}
@@ -317,21 +322,21 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
           <p className="text-[11px] font-medium tracking-[0.24em] text-taupe uppercase">
             Réservation en ligne
           </p>
-          <h2 id="reservation-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-4xl">
+          <h2 id="reservation-heading" className="mt-1 font-serif text-2xl text-charcoal sm:text-3xl">
             Réserver votre créneau
           </h2>
-          <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-taupe sm:text-sm">
-            Réservation intuitive et fluide étape par étape.
+          <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-taupe">
+            Réservation intuitive et rapide en 3 étapes.
           </p>
         </div>
 
         {/* Stepper épuré et carré — Style du site */}
-        <div className="mt-8 mb-8 border border-charcoal/15 bg-white p-3 sm:p-4">
+        <div className="mt-4 mb-4 border border-charcoal/15 bg-white p-2 sm:p-3">
           <div className="grid grid-cols-3 gap-2 text-center">
             <button
               type="button"
-              onClick={() => setCurrentStep(1)}
-              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+              onClick={() => goToStep(1)}
+              className={`flex flex-col items-center justify-center py-1.5 transition-colors cursor-pointer border-b-2 ${
                 currentStep === 1
                   ? 'border-charcoal text-charcoal font-semibold'
                   : currentStep > 1
@@ -340,15 +345,15 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
               }`}
             >
               <span className="text-[10px] tracking-widest uppercase">Étape 1</span>
-              <span className="font-serif text-sm sm:text-base">Prestation</span>
+              <span className="font-serif text-xs sm:text-sm">Prestation</span>
             </button>
 
             <button
               type="button"
               onClick={() => {
-                if (currentService) setCurrentStep(2);
+                if (currentService) goToStep(2);
               }}
-              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+              className={`flex flex-col items-center justify-center py-1.5 transition-colors cursor-pointer border-b-2 ${
                 currentStep === 2
                   ? 'border-charcoal text-charcoal font-semibold'
                   : currentStep > 2
@@ -357,22 +362,22 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
               }`}
             >
               <span className="text-[10px] tracking-widest uppercase">Étape 2</span>
-              <span className="font-serif text-sm sm:text-base">Date & Heure</span>
+              <span className="font-serif text-xs sm:text-sm">Date & Heure</span>
             </button>
 
             <button
               type="button"
               onClick={() => {
-                if (currentService && dayAvailability.isDayOpen) setCurrentStep(3);
+                if (currentService && dayAvailability.isDayOpen) goToStep(3);
               }}
-              className={`flex flex-col items-center justify-center py-2 transition-colors cursor-pointer border-b-2 ${
+              className={`flex flex-col items-center justify-center py-1.5 transition-colors cursor-pointer border-b-2 ${
                 currentStep === 3
                   ? 'border-charcoal text-charcoal font-semibold'
                   : 'border-transparent text-taupe'
               }`}
             >
               <span className="text-[10px] tracking-widest uppercase">Étape 3</span>
-              <span className="font-serif text-sm sm:text-base">Coordonnées</span>
+              <span className="font-serif text-xs sm:text-sm">Coordonnées</span>
             </button>
           </div>
         </div>
@@ -380,7 +385,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
         <form
           onSubmit={handleSubmit}
           aria-labelledby="reservation-heading"
-          className="border border-charcoal/15 bg-white p-5 shadow-[0_24px_60px_-30px_rgba(20,19,17,0.14)] sm:p-10"
+          className="border border-charcoal/15 bg-white p-4 shadow-[0_16px_40px_-20px_rgba(20,19,17,0.10)] sm:p-7"
         >
           {errorMessage && (
             <p role="alert" className="mb-6 border border-red-800/30 bg-red-50 px-4 py-3 text-xs text-red-900">

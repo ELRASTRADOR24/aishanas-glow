@@ -10,10 +10,14 @@ export const ReserverPage: React.FC = () => {
   const serviceParam = searchParams.get('service');
   const variantParam = searchParams.get('variant') as BookingVariant | null;
 
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [serviceParam, variantParam]);
+
   return (
     <div className="min-h-dvh bg-paper text-charcoal">
       <Navbar />
-      <main className="pt-20 sm:pt-28">
+      <main className="pt-16 sm:pt-20">
         <BookingSection
           preselectedServiceId={serviceParam}
           preselectedVariant={variantParam}
