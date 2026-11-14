@@ -1229,6 +1229,14 @@ export const AdminPage: React.FC = () => {
                       {showEditor && (
                         <>
                           <div className="mt-4 grid gap-3 border-t border-stone/60 bg-ivory/70 p-4 sm:grid-cols-3">
+                            <div className="sm:col-span-3 flex items-center justify-between">
+                              <span className="text-[10px] font-semibold tracking-wider text-charcoal/80 uppercase">
+                                Modifier la date & l'heure du rendez-vous
+                              </span>
+                              <span className="text-[10px] text-taupe">
+                                Modifiez ci-dessous avant de cliquer sur Valider
+                              </span>
+                            </div>
                             <div>
                               <label
                                 htmlFor={`booking-date-${booking.id}`}
@@ -1362,10 +1370,18 @@ export const AdminPage: React.FC = () => {
                                     [booking.id]: !prev[booking.id],
                                   }))
                                 }
-                                className="inline-flex min-h-[42px] items-center gap-1.5 border border-charcoal/40 bg-ivory/50 px-3.5 py-2 text-xs font-medium text-charcoal uppercase hover:bg-stone/20 cursor-pointer"
+                                className={`inline-flex min-h-[42px] items-center gap-1.5 border px-3.5 py-2 text-xs font-medium uppercase cursor-pointer transition-colors ${
+                                  showSlotsProposer[booking.id]
+                                    ? 'border-charcoal bg-charcoal text-ivory'
+                                    : 'border-charcoal/40 bg-ivory/50 text-charcoal hover:bg-stone/20'
+                                }`}
                               >
                                 <Calendar className="h-4 w-4" aria-hidden="true" />
-                                <span>Proposer plusieurs créneaux</span>
+                                <span>
+                                  {showSlotsProposer[booking.id]
+                                    ? 'Fermer les options'
+                                    : 'Proposer de nouvelles dates'}
+                                </span>
                               </button>
                             </div>
 
