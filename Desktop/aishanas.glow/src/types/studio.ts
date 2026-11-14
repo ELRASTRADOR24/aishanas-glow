@@ -72,6 +72,13 @@ export interface CloudinaryConfig {
   folder: string;
 }
 
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+  active?: boolean;
+}
+
 export interface StudioConfig {
   brandName: string;
   handle: string;
@@ -83,6 +90,18 @@ export interface StudioConfig {
   certificationLine: string;
   heroTitle: string;
   heroSubtitle: string;
+  heroBadge?: string;
+  heroCtaText?: string;
+  heroSecondaryCtaText?: string;
+  tarifsTitle?: string;
+  tarifsSubtitle?: string;
+  tarifsCategoryBadge?: string;
+  protocolsTitle?: string;
+  protocolsSubtitle?: string;
+  protocolsCategoryBadge?: string;
+  faqTitle?: string;
+  faqSubtitle?: string;
+  faqCategoryBadge?: string;
   instagramBannerTitle: string;
   instagramBannerText: string;
   contactEmail: string; // Admin Gmail receiving new booking alerts
@@ -157,6 +176,7 @@ export interface StudioData {
   addons: ServiceAddon[];
   protocols: ProtocolBlock[];
   media: MediaAsset[];
+  faqs?: FaqItem[];
   bookings: BookingRequest[];
   occupiedSlots: OccupiedSlot[];
   emailLogs: EmailLogEntry[];

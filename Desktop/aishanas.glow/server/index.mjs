@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import nodemailer from 'nodemailer';
 import mongoose from 'mongoose';
-import { DEFAULT_SERVER_STUDIO } from './defaultData.mjs';
+import { DEFAULT_SERVER_STUDIO, DEFAULT_FAQS } from './defaultData.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -295,6 +295,7 @@ function loadStudio() {
     addons: existing.addons || DEFAULT_SERVER_STUDIO.addons,
     protocols: existing.protocols || DEFAULT_SERVER_STUDIO.protocols,
     media: existing.media || [],
+    faqs: existing.faqs || DEFAULT_FAQS,
     bookings: existing.bookings || [],
     emailLogs: existing.emailLogs || [],
   };
@@ -873,6 +874,9 @@ function buildPublicStudio(studio) {
       (p) => p.group !== 'blanchiment' || publicServices.some((s) => s.category === 'blanchiment' && s.active)
     ),
     media: studio.media,
+    faqs: (studio.faqs && studio.faqs.length > 0 ? studio.faqs : DEFAULT_FAQS).filter(
+      (f) => f.active !== false
+    ),
     bookings: [],
     occupiedSlots,
     emailLogs: [],
@@ -888,6 +892,7 @@ function buildAdminStudio(studio) {
 
   return {
     ...studio,
+    faqs: studio.faqs && studio.faqs.length > 0 ? studio.faqs : DEFAULT_FAQS,
     occupiedSlots,
     emailLogs: studio.emailLogs || [],
     smtpStatus: getEmailProviderStatus(secrets),
@@ -1344,6 +1349,7 @@ app.put('/api/admin/studio', requireAdmin, (req, res) => {
   if (Array.isArray(body.addons)) studio.addons = body.addons;
   if (Array.isArray(body.protocols)) studio.protocols = body.protocols;
   if (Array.isArray(body.media)) studio.media = body.media;
+  if (Array.isArray(body.faqs)) studio.faqs = body.faqs;
   if (Array.isArray(body.bookings)) studio.bookings = body.bookings;
 
   writeJsonSafe(STUDIO_FILE, studio);

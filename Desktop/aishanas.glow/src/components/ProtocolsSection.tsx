@@ -22,14 +22,14 @@ export const ProtocolsSection: React.FC = () => {
       <div className="relative z-10 mx-auto max-w-4xl">
         <div className="text-center">
           <p className="text-[11px] font-medium tracking-[0.24em] text-stone uppercase">
-            Informations & Précautions
+            {data.config.protocolsCategoryBadge || 'Informations & Précautions'}
           </p>
           <h2 id="protocoles-heading" className="mt-2 font-serif text-3xl text-ivory sm:text-5xl">
-            Protocoles & Qualité des soins
+            {data.config.protocolsTitle || 'Protocoles & Qualité des soins'}
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-xs leading-relaxed text-stone/85 sm:text-sm">
-            Tout ce qu’il faut connaître avant votre rendez-vous : composition des soins,
-            contre-indications et consignes post-séance.
+            {data.config.protocolsSubtitle ||
+              'Tout ce qu’il faut connaître avant votre rendez-vous : composition des soins, contre-indications et consignes post-séance.'}
           </p>
         </div>
 

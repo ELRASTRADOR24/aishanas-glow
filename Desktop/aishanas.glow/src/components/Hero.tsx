@@ -22,15 +22,15 @@ export const Hero: React.FC = () => {
         />
 
         <p className="mb-3 text-[11px] font-medium tracking-[0.28em] text-stone uppercase">
-          Studio Privé · {config.city}
+          {config.heroBadge || `Studio Privé · ${config.city}`}
         </p>
 
         <h1 className="mx-auto max-w-2xl font-serif text-4xl leading-[1.1] font-normal text-ivory sm:text-6xl">
-          L’art du regard et de l’éclat sur mesure
+          {config.heroTitle || 'L’art du regard et de l’éclat sur mesure'}
         </h1>
 
         <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-stone/90 sm:text-base font-light">
-          Extensions de cils haute précision et rehaussement soin profond.
+          {config.heroSubtitle || 'Extensions de cils haute précision et rehaussement soin profond.'}
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -38,7 +38,7 @@ export const Hero: React.FC = () => {
             href="/reserver"
             className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 border border-ivory bg-ivory px-8 py-3 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone sm:w-auto"
           >
-            <span>Réserver un soin</span>
+            <span>{config.heroCtaText || 'Réserver un soin'}</span>
             <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
           </a>
           <a
@@ -54,7 +54,7 @@ export const Hero: React.FC = () => {
             }}
             className="inline-flex min-h-[48px] w-full items-center justify-center border border-stone/50 px-8 py-3 text-xs font-medium tracking-[0.2em] text-ivory uppercase transition-colors hover:border-ivory sm:w-auto"
           >
-            Carte des prestations
+            {config.heroSecondaryCtaText || 'Carte des prestations'}
           </a>
         </div>
 

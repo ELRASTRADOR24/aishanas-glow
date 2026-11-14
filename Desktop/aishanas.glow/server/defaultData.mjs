@@ -1,3 +1,41 @@
+export const DEFAULT_FAQS = [
+  {
+    id: 'depose',
+    question: 'La dépose de cils est-elle gratuite ?',
+    answer:
+      'La dépose est 100% offerte si vous effectuez une nouvelle pose de cils au studio immédiatement après (option gratuite à cocher lors de votre réservation). La dépose seule sans nouvelle pose reste à 10 € pour un travail studio ou 15 € pour une pose extérieure.',
+    active: true,
+  },
+  {
+    id: 'remplissage',
+    question: 'Quel est le délai pour un remplissage ?',
+    answer:
+      'Le tarif remplissage est valable jusqu’à 3 semaines maximum après votre pose. Au-delà de 3 semaines, une nouvelle pose complète est requise pour assurer la santé de vos cils naturels et un résultat impeccable.',
+    active: true,
+  },
+  {
+    id: 'supplement',
+    question: 'Quels sont les créneaux avec supplément ?',
+    answer:
+      'Le studio applique un supplément de 10 € pour les créneaux en soirée (à partir de 19h00), ainsi que le dimanche et les jours fériés.',
+    active: true,
+  },
+  {
+    id: 'finitions',
+    question: 'Peut-on demander des cils marrons ou des décos ?',
+    answer:
+      'Oui, les poses en cils marrons (effet très doux et naturel) ainsi que les finitions paillettes et décos sont disponibles. Il suffit de l’indiquer dans les précisions de votre réservation.',
+    active: true,
+  },
+  {
+    id: 'duree-pose',
+    question: 'Combien de temps dure une prestation de cils ?',
+    answer:
+      'Chaque pose d’extensions de cils dure 2 heures pour garantir un travail soigné, précis cil par cil et une excellente tenue. Merci de venir sans maquillage des yeux pour optimiser la prise de la colle.',
+    active: true,
+  },
+];
+
 export const DEFAULT_SERVER_STUDIO = {
   config: {
     brandName: "Alshana's Glow",
@@ -386,6 +424,7 @@ export const DEFAULT_SERVER_STUDIO = {
       createdAt: '2026-11-11T22:10:00.000Z',
     },
   ],
+  faqs: DEFAULT_FAQS,
   bookings: [],
   emailLogs: [],
 };

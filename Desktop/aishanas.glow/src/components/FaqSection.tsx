@@ -1,47 +1,15 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
-
-interface FaqItem {
-  id: string;
-  question: string;
-  answer: string;
-}
-
-const FAQ_ITEMS: FaqItem[] = [
-  {
-    id: 'depose',
-    question: 'La dépose de cils est-elle gratuite ?',
-    answer:
-      'La dépose est 100% offerte si vous effectuez une nouvelle pose de cils au studio immédiatement après (option gratuite à cocher lors de votre réservation). La dépose seule sans nouvelle pose reste à 10 € pour un travail studio ou 15 € pour une pose extérieure.',
-  },
-  {
-    id: 'remplissage',
-    question: 'Quel est le délai pour un remplissage ?',
-    answer:
-      'Le tarif remplissage est valable jusqu’à 3 semaines maximum après votre pose. Au-delà de 3 semaines, une nouvelle pose complète est requise pour assurer la santé de vos cils naturels et un résultat impeccable.',
-  },
-  {
-    id: 'supplement',
-    question: 'Quels sont les créneaux avec supplément ?',
-    answer:
-      'Le studio applique un supplément de 5 € pour les créneaux en soirée (à partir de 18h00), ainsi que le dimanche et les jours fériés.',
-  },
-  {
-    id: 'finitions',
-    question: 'Peut-on demander des cils marrons ou des décos ?',
-    answer:
-      'Oui, les poses en cils marrons (effet très doux et naturel) ainsi que les finitions paillettes et décos sont disponibles. Il suffit de l’indiquer dans les précisions de votre réservation.',
-  },
-  {
-    id: 'duree-pose',
-    question: 'Combien de temps dure une prestation de cils ?',
-    answer:
-      'Chaque pose d’extensions de cils dure environ 2 heures pour garantir un travail soigné, précis cil par cil et une excellente tenue. Merci de venir sans maquillage des yeux pour optimiser la prise de la colle.',
-  },
-];
+import { useStudio } from '../context/StudioContext';
+import { DEFAULT_FAQS } from '../data/defaultStudioData';
 
 export const FaqSection: React.FC = () => {
+  const { data } = useStudio();
   const [openIds, setOpenIds] = useState<Set<string>>(new Set(['depose']));
+
+  const activeFaqs = (data.faqs && data.faqs.length > 0 ? data.faqs : DEFAULT_FAQS).filter(
+    (item) => item.active !== false
+  );
 
   const toggleItem = (id: string) => {
     setOpenIds((prev) => {
@@ -64,18 +32,18 @@ export const FaqSection: React.FC = () => {
       <div className="mx-auto max-w-3xl">
         <div className="text-center mb-10">
           <p className="text-[11px] font-medium tracking-[0.24em] text-taupe uppercase">
-            Informations &amp; Conseils
+            {data.config.faqCategoryBadge || 'Informations & Conseils'}
           </p>
           <h2 id="faq-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-4xl">
-            Questions fréquentes
+            {data.config.faqTitle || 'Questions fréquentes'}
           </h2>
           <p className="mt-2 text-xs text-taupe sm:text-sm">
-            Toutes les réponses pour préparer votre rendez-vous en toute sérénité.
+            {data.config.faqSubtitle || 'Toutes les réponses pour préparer votre rendez-vous en toute sérénité.'}
           </p>
         </div>
 
         <div className="border border-charcoal/15 bg-white divide-y divide-charcoal/10">
-          {FAQ_ITEMS.map((item) => {
+          {activeFaqs.map((item) => {
             const isOpen = openIds.has(item.id);
             return (
               <div key={item.id} className="transition-colors hover:bg-ivory/30">

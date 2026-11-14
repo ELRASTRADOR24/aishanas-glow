@@ -42,13 +42,13 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
         {/* Header minimaliste */}
         <div className="mb-12 text-center">
           <p className="text-[10px] font-medium tracking-[0.28em] text-taupe uppercase">
-            Menu du Studio
+            {data.config.tarifsCategoryBadge || 'Menu du Studio'}
           </p>
           <h2 id="tarifs-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-5xl font-normal">
-            Prestations &amp; Tarifs
+            {data.config.tarifsTitle || 'Prestations & Tarifs'}
           </h2>
           <p className="mt-2 text-xs tracking-wide text-taupe sm:text-sm">
-            Cliquez sur une prestation pour choisir votre créneau.
+            {data.config.tarifsSubtitle || 'Cliquez sur une prestation pour choisir votre créneau.'}
           </p>
         </div>
 

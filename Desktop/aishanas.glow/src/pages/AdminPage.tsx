@@ -31,11 +31,13 @@ import type {
   BookingRequest,
   BookingStatus,
   EmailLogEntry,
+  FaqItem,
   ProtocolBlock,
   ServiceAddon,
   ServiceCategory,
   ServiceItem,
 } from '../types/studio';
+import { DEFAULT_FAQS } from '../data/defaultStudioData';
 import { formatFrenchDate } from '../utils/bookingLogic';
 import { isVideoUrl, optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/cloudinary';
 import { AestheticMediaViewer } from '../components/AestheticMediaViewer';
@@ -207,6 +209,8 @@ export const AdminPage: React.FC = () => {
     deleteAddon,
     upsertProtocol,
     deleteProtocol,
+    upsertFaq,
+    deleteFaq,
     addMediaAsset,
     deleteMediaAsset,
     updateBookingDecision,
@@ -304,6 +308,10 @@ export const AdminPage: React.FC = () => {
   const [newProtoGroup, setNewProtoGroup] = useState<'rehaussement' | 'blanchiment'>('rehaussement');
   const [newProtoTitle, setNewProtoTitle] = useState('');
   const [newProtoItems, setNewProtoItems] = useState('');
+
+  // New FAQ Item State
+  const [newFaqQuestion, setNewFaqQuestion] = useState('');
+  const [newFaqAnswer, setNewFaqAnswer] = useState('');
 
   // Cloudinary Upload State
   const [uploading, setUploading] = useState(false);
@@ -838,6 +846,32 @@ export const AdminPage: React.FC = () => {
     notify('Bloc protocole ajouté.');
   };
 
+  const handleAddFaq = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFaqQuestion.trim() || !newFaqAnswer.trim()) {
+      notifyError('Veuillez renseigner la question et la réponse.');
+      return;
+    }
+    const newFaq: FaqItem = {
+      id: `faq-${Date.now()}`,
+      question: newFaqQuestion.trim(),
+      answer: newFaqAnswer.trim(),
+      active: true,
+    };
+    await upsertFaq(newFaq);
+    setNewFaqQuestion('');
+    setNewFaqAnswer('');
+    notify('Question FAQ enregistrée avec succès.');
+  };
+
+  const handleResetFaqs = async () => {
+    if (!window.confirm('Rétablir les questions fréquentes par défaut sur le site ?')) return;
+    for (const faq of DEFAULT_FAQS) {
+      await upsertFaq(faq);
+    }
+    notify('Questions FAQ par défaut rétablies.');
+  };
+
   const handleCloudinaryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1256,12 +1290,12 @@ export const AdminPage: React.FC = () => {
                         <Upload className="h-3.5 w-3.5" />
                         <span>
                           {uploadingServiceId === service.id
-                            ? 'Compression & Envoi...'
-                            : 'Changer la photo (ou vidéo)'}
+                            ? 'Envoi en cours...'
+                            : 'Changer la photo ou vidéo'}
                         </span>
                         <input
                           type="file"
-                          accept="image/*,video/*"
+                          accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
                           disabled={uploadingServiceId === service.id}
                           onChange={(e) => {
                             const f = e.target.files?.[0];
@@ -1332,6 +1366,24 @@ export const AdminPage: React.FC = () => {
                     value={data.config.handle}
                     onChange={(e) => updateConfig({ handle: e.target.value })}
                     className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Titre principal du site (Hero)</label>
+                  <input
+                    type="text"
+                    value={data.config.heroTitle}
+                    onChange={(e) => updateConfig({ heroTitle: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] text-taupe uppercase">Sous-titre descriptif (Hero)</label>
+                  <textarea
+                    rows={2}
+                    value={data.config.heroSubtitle}
+                    onChange={(e) => updateConfig({ heroSubtitle: e.target.value })}
+                    className="mt-1 w-full border border-stone px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -2784,7 +2836,7 @@ export const AdminPage: React.FC = () => {
                                       </span>
                                       <input
                                         type="file"
-                                        accept="image/*,video/*"
+                                        accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
                                         disabled={uploadingServiceId === service.id}
                                         onChange={(e) => {
                                           const f = e.target.files?.[0];
@@ -3087,109 +3139,183 @@ export const AdminPage: React.FC = () => {
         {/* TAB 5: CONTENT & PROTOCOLS */}
         {activeTab === 'content' && (
           <section className="space-y-8">
-            <div className="space-y-4 border border-stone bg-white p-6">
-              <h2 className="font-serif text-3xl text-charcoal">Identité & Textes du site</h2>
+            <div className="space-y-6 border border-stone bg-white p-6">
+              <div>
+                <h2 className="font-serif text-3xl text-charcoal">Identité &amp; Textes du site</h2>
+                <p className="mt-1 text-xs text-taupe">
+                  Personnalisez l’intégralité des titres, slogans, textes et informations affichés sur chaque section du site vitrine.
+                </p>
+              </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              {/* 1. Coordonnées & Studio */}
+              <div className="border border-stone/60 bg-ivory/30 p-4 space-y-4">
+                <h3 className="font-serif text-lg text-charcoal font-medium">1. Studio &amp; Coordonnées</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Nom de marque</label>
+                    <input
+                      type="text"
+                      value={data.config.brandName}
+                      onChange={(e) => updateConfig({ brandName: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Handle Instagram</label>
+                    <input
+                      type="text"
+                      value={data.config.handle}
+                      onChange={(e) => updateConfig({ handle: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">URL Instagram</label>
+                    <input
+                      type="url"
+                      value={data.config.instagramUrl}
+                      onChange={(e) => updateConfig({ instagramUrl: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">
+                      Localisation publique (quartier / ville)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.config.locationLine}
+                      onChange={(e) => updateConfig({ locationLine: e.target.value })}
+                      placeholder="Ex. À deux pas de la Place Napoléon, La Roche-sur-Yon"
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                    <p className="mt-1 text-[10px] text-taupe">Affiché publiquement sur le site (Hero &amp; Footer)</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-medium text-emerald-900 uppercase">
+                      Adresse exacte privée du studio (Confidentialité)
+                    </label>
+                    <input
+                      type="text"
+                      value={data.config.exactStudioAddress || ''}
+                      onChange={(e) => updateConfig({ exactStudioAddress: e.target.value })}
+                      placeholder="Ex. 2 rue du Général Gallieni, 85000 La Roche-sur-Yon"
+                      className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm bg-emerald-50/20"
+                    />
+                    <p className="mt-1 text-[10px] text-emerald-800">
+                      Masquée du site public · Envoyée UNIQUEMENT dans l'e-mail de confirmation après validation
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. En-tête / Hero */}
+              <div className="border border-stone/60 bg-ivory/30 p-4 space-y-4">
+                <h3 className="font-serif text-lg text-charcoal font-medium">2. En-tête &amp; Bannière d'accueil (Hero)</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Badge supérieur (surtitre)</label>
+                    <input
+                      type="text"
+                      value={data.config.heroBadge || ''}
+                      placeholder="Ex. Studio Privé · La Roche-sur-Yon"
+                      onChange={(e) => updateConfig({ heroBadge: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Bouton d'action principal</label>
+                    <input
+                      type="text"
+                      value={data.config.heroCtaText || ''}
+                      placeholder="Ex. Réserver un soin"
+                      onChange={(e) => updateConfig({ heroCtaText: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-[11px] text-taupe uppercase">Nom de marque</label>
+                  <label className="block text-[11px] text-taupe uppercase">Titre principal (H1)</label>
                   <input
                     type="text"
-                    value={data.config.brandName}
-                    onChange={(e) => updateConfig({ brandName: e.target.value })}
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                    value={data.config.heroTitle}
+                    onChange={(e) => updateConfig({ heroTitle: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-taupe uppercase">Handle Instagram</label>
-                  <input
-                    type="text"
-                    value={data.config.handle}
-                    onChange={(e) => updateConfig({ handle: e.target.value })}
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  <label className="block text-[11px] text-taupe uppercase">Sous-titre descriptif</label>
+                  <textarea
+                    rows={2}
+                    value={data.config.heroSubtitle}
+                    onChange={(e) => updateConfig({ heroSubtitle: e.target.value })}
+                    className="mt-1 w-full border border-stone bg-white px-3 py-2 text-sm"
                   />
                 </div>
+              </div>
+
+              {/* 3. Section Prestations & Tarifs */}
+              <div className="border border-stone/60 bg-ivory/30 p-4 space-y-4">
+                <h3 className="font-serif text-lg text-charcoal font-medium">3. En-tête de la Carte des Prestations</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Surtitre</label>
+                    <input
+                      type="text"
+                      value={data.config.tarifsCategoryBadge || ''}
+                      placeholder="Ex. Menu du Studio"
+                      onChange={(e) => updateConfig({ tarifsCategoryBadge: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-taupe uppercase">Titre de la section</label>
+                    <input
+                      type="text"
+                      value={data.config.tarifsTitle || ''}
+                      placeholder="Ex. Prestations & Tarifs"
+                      onChange={(e) => updateConfig({ tarifsTitle: e.target.value })}
+                      className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="block text-[11px] text-taupe uppercase">URL Instagram</label>
+                  <label className="block text-[11px] text-taupe uppercase">Sous-titre descriptif</label>
                   <input
-                    type="url"
-                    value={data.config.instagramUrl}
-                    onChange={(e) => updateConfig({ instagramUrl: e.target.value })}
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                    type="text"
+                    value={data.config.tarifsSubtitle || ''}
+                    placeholder="Ex. Cliquez sur une prestation pour choisir votre créneau."
+                    onChange={(e) => updateConfig({ tarifsSubtitle: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* 4. Section Instagram */}
+              <div className="border border-stone/60 bg-ivory/30 p-4 space-y-4">
+                <h3 className="font-serif text-lg text-charcoal font-medium">4. Bannière Officielle Instagram</h3>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">
+                    Titre bloc Instagram
+                  </label>
+                  <input
+                    type="text"
+                    value={data.config.instagramBannerTitle}
+                    onChange={(e) => updateConfig({ instagramBannerTitle: e.target.value })}
+                    className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] text-taupe uppercase">
-                    Localisation publique (quartier / ville)
+                    Texte bloc Instagram
                   </label>
-                  <input
-                    type="text"
-                    value={data.config.locationLine}
-                    onChange={(e) => updateConfig({ locationLine: e.target.value })}
-                    placeholder="Ex. À deux pas de la Place Napoléon, La Roche-sur-Yon"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
+                  <textarea
+                    rows={2}
+                    value={data.config.instagramBannerText}
+                    onChange={(e) => updateConfig({ instagramBannerText: e.target.value })}
+                    className="mt-1 w-full border border-stone bg-white px-3 py-2 text-sm"
                   />
-                  <p className="mt-1 text-[10px] text-taupe">Affiché publiquement sur le site (Hero & Footer)</p>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-emerald-900 uppercase">
-                    Adresse exacte privée du studio (Confidentialité)
-                  </label>
-                  <input
-                    type="text"
-                    value={data.config.exactStudioAddress || ''}
-                    onChange={(e) => updateConfig({ exactStudioAddress: e.target.value })}
-                    placeholder="Ex. 2 rue du Général Gallieni, 85000 La Roche-sur-Yon"
-                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm bg-emerald-50/20"
-                  />
-                  <p className="mt-1 text-[10px] text-emerald-800">
-                    Masquée du site public · Envoyée UNIQUEMENT dans l'e-mail de confirmation après validation
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-taupe uppercase">Titre Hero</label>
-                <input
-                  type="text"
-                  value={data.config.heroTitle}
-                  onChange={(e) => updateConfig({ heroTitle: e.target.value })}
-                  className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-taupe uppercase">Sous-titre Hero</label>
-                <textarea
-                  rows={2}
-                  value={data.config.heroSubtitle}
-                  onChange={(e) => updateConfig({ heroSubtitle: e.target.value })}
-                  className="mt-1 w-full border border-stone px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-taupe uppercase">
-                  Titre bloc Instagram
-                </label>
-                <input
-                  type="text"
-                  value={data.config.instagramBannerTitle}
-                  onChange={(e) => updateConfig({ instagramBannerTitle: e.target.value })}
-                  className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] text-taupe uppercase">
-                  Texte bloc Instagram
-                </label>
-                <textarea
-                  rows={2}
-                  value={data.config.instagramBannerText}
-                  onChange={(e) => updateConfig({ instagramBannerText: e.target.value })}
-                  className="mt-1 w-full border border-stone px-3 py-2 text-sm"
-                />
               </div>
             </div>
 
@@ -3267,6 +3393,143 @@ export const AdminPage: React.FC = () => {
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
                   <span>Ajouter ce bloc</span>
+                </button>
+              </form>
+            </div>
+
+            {/* 5. Foire Aux Questions (FAQ) entièrement dynamique */}
+            <div className="space-y-4 border border-stone bg-white p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-serif text-2xl text-charcoal">
+                    Foire Aux Questions (FAQ)
+                  </h3>
+                  <p className="text-xs text-taupe">
+                    Modifiez directement chaque question et réponse affichée dans la section FAQ du site public.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResetFaqs}
+                  className="border border-stone px-3 py-1.5 text-xs text-taupe hover:text-charcoal transition-colors cursor-pointer"
+                >
+                  Restaurer les questions types
+                </button>
+              </div>
+
+              {/* Titre et sous-titre de la section FAQ */}
+              <div className="grid gap-3 sm:grid-cols-3 border-b border-stone/50 pb-4">
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Surtitre section FAQ</label>
+                  <input
+                    type="text"
+                    value={data.config.faqCategoryBadge || ''}
+                    placeholder="Ex. Informations &amp; Conseils"
+                    onChange={(e) => updateConfig({ faqCategoryBadge: e.target.value })}
+                    className="mt-1 min-h-[40px] w-full border border-stone bg-white px-3 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Titre section FAQ</label>
+                  <input
+                    type="text"
+                    value={data.config.faqTitle || ''}
+                    placeholder="Ex. Questions fréquentes"
+                    onChange={(e) => updateConfig({ faqTitle: e.target.value })}
+                    className="mt-1 min-h-[40px] w-full border border-stone bg-white px-3 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-taupe uppercase">Sous-titre descriptif</label>
+                  <input
+                    type="text"
+                    value={data.config.faqSubtitle || ''}
+                    placeholder="Ex. Toutes les réponses pour préparer votre rendez-vous en toute sérénité."
+                    onChange={(e) => updateConfig({ faqSubtitle: e.target.value })}
+                    className="mt-1 min-h-[40px] w-full border border-stone bg-white px-3 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Liste des questions éditables */}
+              <div className="space-y-4">
+                {(data.faqs && data.faqs.length > 0 ? data.faqs : DEFAULT_FAQS).map((faq) => (
+                  <div key={faq.id} className="border border-stone/70 bg-ivory/40 p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="block text-[10px] text-taupe uppercase font-medium">Question</label>
+                        <input
+                          type="text"
+                          value={faq.question}
+                          onChange={(e) => upsertFaq({ ...faq, question: e.target.value })}
+                          className="mt-1 min-h-[40px] w-full border border-stone bg-white px-3 py-1.5 font-medium text-sm text-charcoal"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 pt-4">
+                        <button
+                          type="button"
+                          onClick={() => upsertFaq({ ...faq, active: faq.active === false ? true : false })}
+                          className={`border px-2.5 py-1 text-[11px] uppercase font-medium transition-colors cursor-pointer ${
+                            faq.active !== false
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                              : 'border-stone bg-stone/20 text-taupe'
+                          }`}
+                        >
+                          {faq.active !== false ? 'Affiché' : 'Masqué'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            deleteFaq(faq.id);
+                            notify('Question FAQ supprimée.');
+                          }}
+                          className="inline-flex min-h-[36px] items-center gap-1 border border-red-200 bg-white px-3 py-1 text-xs text-red-800 hover:bg-red-50 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          <span>Supprimer</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-taupe uppercase font-medium">Réponse détaillée</label>
+                      <textarea
+                        rows={3}
+                        value={faq.answer}
+                        onChange={(e) => upsertFaq({ ...faq, answer: e.target.value })}
+                        className="mt-1 w-full border border-stone bg-white px-3 py-2 text-xs leading-relaxed text-charcoal font-light"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Formulaire pour ajouter une nouvelle question */}
+              <form onSubmit={handleAddFaq} className="space-y-3 border-t border-stone pt-4">
+                <h4 className="font-serif text-xl text-charcoal">Ajouter une nouvelle question</h4>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Intitulé de la question (ex. Comment venir au studio ?)"
+                    value={newFaqQuestion}
+                    onChange={(e) => setNewFaqQuestion(e.target.value)}
+                    className="min-h-[44px] w-full border border-stone px-3 text-sm bg-white"
+                  />
+                </div>
+                <div>
+                  <textarea
+                    rows={3}
+                    placeholder="Réponse détaillée..."
+                    value={newFaqAnswer}
+                    onChange={(e) => setNewFaqAnswer(e.target.value)}
+                    className="w-full border border-stone px-3 py-2 text-sm bg-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex min-h-[44px] items-center gap-2 border border-charcoal bg-charcoal px-4 py-2 text-xs font-medium text-ivory uppercase hover:bg-stone hover:text-charcoal transition-colors cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  <span>Enregistrer cette question</span>
                 </button>
               </form>
             </div>
@@ -3365,7 +3628,7 @@ export const AdminPage: React.FC = () => {
                       </span>
                       <input
                         type="file"
-                        accept="image/*,video/*"
+                        accept="image/*,video/*,.mp4,.mov,.webm,.m4v,.heic"
                         disabled={uploading}
                         onChange={handleCloudinaryUpload}
                         className="visually-hidden"

@@ -4,6 +4,7 @@ import type {
   BookingRequest,
   BookingStatus,
   BookingVariant,
+  FaqItem,
   MediaAsset,
   ProtocolBlock,
   ServiceAddon,
@@ -57,6 +58,8 @@ interface StudioContextValue {
   deleteAddon: (id: string) => Promise<void>;
   upsertProtocol: (protocol: ProtocolBlock) => Promise<void>;
   deleteProtocol: (id: string) => Promise<void>;
+  upsertFaq: (faq: FaqItem) => Promise<void>;
+  deleteFaq: (id: string) => Promise<void>;
   addMediaAsset: (asset: MediaAsset) => Promise<void>;
   deleteMediaAsset: (id: string) => Promise<void>;
   updateBookingDecision: (
@@ -127,6 +130,7 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
     })),
     addons: raw.addons ?? DEFAULT_STUDIO_DATA.addons,
     protocols: raw.protocols ?? DEFAULT_STUDIO_DATA.protocols,
+    faqs: raw.faqs ?? DEFAULT_STUDIO_DATA.faqs,
     media: raw.media ?? DEFAULT_STUDIO_DATA.media,
     bookings: raw.bookings ?? [],
     occupiedSlots: raw.occupiedSlots ?? [],
@@ -501,6 +505,27 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await persistAdminUpdate(next);
   };
 
+  const upsertFaq = async (faq: FaqItem) => {
+    const currentFaqs = data.faqs || [];
+    const exists = currentFaqs.some((f) => f.id === faq.id);
+    const next: StudioData = {
+      ...data,
+      faqs: exists
+        ? currentFaqs.map((f) => (f.id === faq.id ? faq : f))
+        : [...currentFaqs, faq],
+    };
+    await persistAdminUpdate(next);
+  };
+
+  const deleteFaq = async (id: string) => {
+    const currentFaqs = data.faqs || [];
+    const next: StudioData = {
+      ...data,
+      faqs: currentFaqs.filter((f) => f.id !== id),
+    };
+    await persistAdminUpdate(next);
+  };
+
   const addMediaAsset = async (asset: MediaAsset) => {
     const next: StudioData = {
       ...data,
@@ -648,6 +673,8 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteAddon,
         upsertProtocol,
         deleteProtocol,
+        upsertFaq,
+        deleteFaq,
         addMediaAsset,
         deleteMediaAsset,
         updateBookingDecision,
