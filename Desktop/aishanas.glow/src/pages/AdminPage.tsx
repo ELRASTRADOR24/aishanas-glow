@@ -32,6 +32,7 @@ import type {
   BookingStatus,
   EmailLogEntry,
   FaqItem,
+  MediaAsset,
   ProtocolBlock,
   ServiceAddon,
   ServiceCategory,
@@ -204,6 +205,7 @@ export const AdminPage: React.FC = () => {
     logoutAdmin,
     updateConfig,
     upsertService,
+    updateServiceMedia,
     deleteService,
     upsertAddon,
     deleteAddon,
@@ -901,19 +903,15 @@ export const AdminPage: React.FC = () => {
     setUploadingServiceId(service.id);
     try {
       const result = await uploadToCloudinary(file, data.config.cloudinary);
-      await upsertService({
-        ...service,
-        imageUrl: result.secureUrl,
-        showImage: true,
-      });
-      await addMediaAsset({
+      const mediaAsset: MediaAsset = {
         id: `med-${Date.now()}`,
         label: `${service.name} — ${file.name.replace(/\.[^.]+$/, '')}`,
         url: result.secureUrl,
         publicId: result.publicId,
         category: service.category,
         createdAt: new Date().toISOString(),
-      });
+      };
+      await updateServiceMedia(service.id, result.secureUrl, mediaAsset);
       notify(
         `${
           result.resourceType === 'video' ? 'Vidéo' : 'Photo'

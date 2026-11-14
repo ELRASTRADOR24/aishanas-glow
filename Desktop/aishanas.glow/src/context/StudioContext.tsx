@@ -53,6 +53,7 @@ interface StudioContextValue {
   submitBooking: (payload: SubmitBookingPayload) => Promise<SubmitBookingResponse>;
   updateConfig: (partial: Partial<StudioConfig>) => Promise<void>;
   upsertService: (service: ServiceItem) => Promise<void>;
+  updateServiceMedia: (serviceId: string, mediaUrl: string, asset?: MediaAsset) => Promise<void>;
   deleteService: (id: string) => Promise<void>;
   upsertAddon: (addon: ServiceAddon) => Promise<void>;
   deleteAddon: (id: string) => Promise<void>;
@@ -171,6 +172,11 @@ function getInitialStudioData(): StudioData {
 
 export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [data, setData] = useState<StudioData>(getInitialStudioData);
+  const dataRef = useRef<StudioData>(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(() => {
     return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
@@ -183,6 +189,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (res.ok) {
         const json = (await res.json()) as Partial<StudioData>;
         const normalized = normalizeStudio(json);
+        dataRef.current = normalized;
         setData(normalized);
         try {
           window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
@@ -211,6 +218,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (res.ok) {
           const json = (await res.json()) as Partial<StudioData>;
           const normalized = normalizeStudio(json);
+          dataRef.current = normalized;
           setData(normalized);
           try {
             window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
@@ -460,6 +468,22 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     await persistAdminUpdate(next);
   };
 
+  const updateServiceMedia = async (serviceId: string, mediaUrl: string, asset?: MediaAsset) => {
+    const current = dataRef.current;
+    const nextServices = current.services.map((s) =>
+      s.id === serviceId ? { ...s, imageUrl: mediaUrl, showImage: true } : s
+    );
+    const nextMedia = asset
+      ? [asset, ...current.media.filter((m) => m.id !== asset.id)]
+      : current.media;
+    const next: StudioData = {
+      ...current,
+      services: nextServices,
+      media: nextMedia,
+    };
+    await persistAdminUpdate(next);
+  };
+
   const deleteService = async (id: string) => {
     const next: StudioData = {
       ...data,
@@ -669,6 +693,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         submitBooking,
         updateConfig,
         upsertService,
+        updateServiceMedia,
         deleteService,
         upsertAddon,
         deleteAddon,

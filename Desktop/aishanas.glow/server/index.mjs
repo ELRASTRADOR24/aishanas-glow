@@ -302,6 +302,23 @@ function loadStudio() {
   return memoryStudio;
 }
 
+async function getStudioData() {
+  await getMongoConnection().catch(() => {});
+  if (isMongoConnected) {
+    try {
+      const doc = await StudioModel.findOne({ key: 'main' }).lean();
+      if (doc?.data) {
+        memoryStudio = doc.data;
+        writeJsonSafe(STUDIO_FILE, memoryStudio);
+        return memoryStudio;
+      }
+    } catch (err) {
+      console.warn('[MongoDB getStudioData Error]:', err?.message);
+    }
+  }
+  return loadStudio();
+}
+
 async function saveStudio(studio) {
   memoryStudio = studio;
   writeJsonSafe(STUDIO_FILE, studio);
@@ -920,9 +937,9 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Public studio read
-app.get('/api/studio', (_req, res, next) => {
+app.get('/api/studio', async (_req, res, next) => {
   try {
-    const studio = loadStudio();
+    const studio = await getStudioData();
     res.json(buildPublicStudio(studio));
   } catch (err) {
     next(err);
@@ -1324,13 +1341,13 @@ app.post('/api/admin/login', (req, res) => {
   res.json({ token, studio: buildAdminStudio(studio) });
 });
 
-app.get('/api/admin/studio', requireAdmin, (_req, res) => {
-  const studio = loadStudio();
+app.get('/api/admin/studio', requireAdmin, async (_req, res) => {
+  const studio = await getStudioData();
   res.json(buildAdminStudio(studio));
 });
 
 app.put('/api/admin/studio', requireAdmin, async (req, res) => {
-  const studio = loadStudio();
+  const studio = await getStudioData();
   const body = req.body || {};
 
   if (body.config) {
