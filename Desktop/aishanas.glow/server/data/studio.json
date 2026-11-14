@@ -386,6 +386,16 @@
   "bookings": [],
   "emailLogs": [
     {
+      "id": "mail-1794625066606-579",
+      "createdAt": "2026-11-14T02:57:46.606Z",
+      "to": "alshanasglow@gmail.com",
+      "subject": "[Alshana's Glow] Test de réception E-mail (Studio)",
+      "kind": "test",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7fd-56ff-78b1-8f4a-ae5b701e43a8) vers alshanasglow@gmail.com.",
+      "previewText": "Ce message confirme que l’envoi d’e-mails fonctionne pour le rôle Studio (alshanasglow@gmail.com)."
+    },
+    {
       "id": "mail-1794622711791-933",
       "createdAt": "2026-11-14T02:18:31.791Z",
       "to": "johansonzoda@gmail.com",
