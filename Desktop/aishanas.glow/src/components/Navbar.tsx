@@ -7,6 +7,18 @@ export const Navbar: React.FC = () => {
   const { data } = useStudio();
   const { config } = data;
 
+  const handleNavAnchor = (hash: string) => (e: React.MouseEvent) => {
+    if (window.location.pathname === '/') {
+      e.preventDefault();
+      const id = hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+        window.history.pushState(null, '', `/#${id}`);
+      }
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 border-b border-stone/70 bg-paper/95 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
@@ -27,18 +39,21 @@ export const Navbar: React.FC = () => {
         <nav aria-label="Navigation principale" className="flex items-center gap-4 sm:gap-7">
           <Link
             to="/#tarifs"
+            onClick={handleNavAnchor('#tarifs')}
             className="hidden text-xs font-medium tracking-widest text-taupe uppercase transition-colors hover:text-charcoal sm:inline-block"
           >
             Tarifs
           </Link>
           <Link
             to="/#protocoles"
+            onClick={handleNavAnchor('#protocoles')}
             className="hidden text-xs font-medium tracking-widest text-taupe uppercase transition-colors hover:text-charcoal sm:inline-block"
           >
             Protocoles
           </Link>
           <Link
             to="/#faq"
+            onClick={handleNavAnchor('#faq')}
             className="hidden text-xs font-medium tracking-widest text-taupe uppercase transition-colors hover:text-charcoal sm:inline-block"
           >
             FAQ

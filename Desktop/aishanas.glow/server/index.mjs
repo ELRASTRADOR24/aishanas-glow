@@ -210,22 +210,33 @@ function loadStudio() {
     writeJsonSafe(STUDIO_FILE, memoryStudio);
     return memoryStudio;
   }
+
+  const existingConfig = existing.config || {};
+  const isOldAddressInLocation = existingConfig.locationLine?.includes('Gallieni');
+  const safeLocation = isOldAddressInLocation
+    ? 'À deux pas de la Place Napoléon, La Roche-sur-Yon'
+    : existingConfig.locationLine || DEFAULT_SERVER_STUDIO.config.locationLine;
+  const exactAddress =
+    existingConfig.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon';
+
   memoryStudio = {
     ...DEFAULT_SERVER_STUDIO,
     ...existing,
     config: {
       ...DEFAULT_SERVER_STUDIO.config,
-      ...(existing.config || {}),
+      ...existingConfig,
+      locationLine: safeLocation,
+      exactStudioAddress: exactAddress,
       cloudinary: {
         ...DEFAULT_SERVER_STUDIO.config.cloudinary,
-        ...(existing.config?.cloudinary || {}),
+        ...(existingConfig.cloudinary || {}),
       },
       bookingRules: {
         ...DEFAULT_SERVER_STUDIO.config.bookingRules,
-        ...(existing.config?.bookingRules || {}),
-        closedWeekdays: existing.config?.bookingRules?.closedWeekdays || [],
-        blockedDates: existing.config?.bookingRules?.blockedDates || [],
-        blockedSlots: existing.config?.bookingRules?.blockedSlots || [],
+        ...(existingConfig.bookingRules || {}),
+        closedWeekdays: existingConfig.bookingRules?.closedWeekdays || [],
+        blockedDates: existingConfig.bookingRules?.blockedDates || [],
+        blockedSlots: existingConfig.bookingRules?.blockedSlots || [],
       },
     },
     services: existing.services || DEFAULT_SERVER_STUDIO.services,
@@ -758,14 +769,23 @@ function requireAdmin(req, res, next) {
 }
 
 function buildPublicStudio(studio) {
-  const { adminPasscode: _hidden, ...safeConfig } = studio.config;
+  const { adminPasscode: _hidden, exactStudioAddress: _privateAddress, ...safeConfig } = studio.config;
   const occupiedSlots = (studio.bookings || [])
     .filter((b) => b.status === 'confirmed')
     .map((b) => ({ date: b.preferredDate, time: b.preferredTime, status: b.status }));
   const secrets = loadEmailSecrets();
 
+  const publicLocation = safeConfig.locationLine?.includes('Gallieni')
+    ? 'À deux pas de la Place Napoléon, La Roche-sur-Yon'
+    : safeConfig.locationLine || 'À deux pas de la Place Napoléon, La Roche-sur-Yon';
+
   return {
-    config: { ...safeConfig, adminPasscode: '' },
+    config: {
+      ...safeConfig,
+      locationLine: publicLocation,
+      exactStudioAddress: '',
+      adminPasscode: '',
+    },
     services: studio.services,
     addons: studio.addons,
     protocols: studio.protocols,
@@ -1062,7 +1082,7 @@ app.post('/api/bookings/confirm-option', async (req, res) => {
         to: booking.clientEmail,
         replyTo: adminRecipient,
         subject: `[${studio.config.brandName}] Votre rendez-vous est confirmé — ${formatDateFr(date)} à ${time}`,
-        text: `Bonjour ${booking.clientName},\nVotre rendez-vous pour ${booking.serviceName} est validé pour le ${formatDateFr(date)} à ${time} au ${studio.config.locationLine}.\nÀ très vite au studio !`,
+        text: `Bonjour ${booking.clientName},\nVotre rendez-vous pour ${booking.serviceName} est validé pour le ${formatDateFr(date)} à ${time} au ${studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'}.\nÀ très vite au studio !`,
         html: createEmailHtml({
           studio,
           statusBadge: `Rendez-vous validé · ${booking.reference}`,
@@ -1073,13 +1093,13 @@ app.post('/api/bookings/confirm-option', async (req, res) => {
             ['Prestation', `${booking.serviceName} (${booking.variantLabel})`],
             ['Date confirmée', formatDateFr(date)],
             ['Heure confirmée', time],
-            ['Lieu du studio', studio.config.locationLine],
+            ['Lieu du rendez-vous', studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'],
           ],
           totalLabel: 'Tarif estimé',
           totalValue: `${booking.totalPrice} €`,
           totalNote: 'Règlement au studio',
-          noteTitle: 'Adresse & consignes',
-          noteBody: `Le studio se situe au ${studio.config.locationLine}. Merci de venir sans maquillage pour optimiser la pose.`,
+          noteTitle: 'Adresse exacte & consignes',
+          noteBody: `Le studio se situe au ${studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'}. Merci de venir sans maquillage pour optimiser la pose.`,
           ctaLabel: 'Consulter le site en ligne',
           ctaUrl: SITE_URL,
           footer: `${studio.config.brandName} · ${studio.config.locationLine}`,
@@ -1310,7 +1330,7 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
       `Date confirmée : ${formatDateFr(updated.preferredDate)}`,
       `Heure confirmée : ${updated.preferredTime}`,
       `Tarif estimé : ${updated.totalPrice} €${updated.isSupplementApplied ? ` (inclut +${updated.supplementPrice} € : ${updated.supplementReason})` : ''}`,
-      `Lieu : ${studio.config.locationLine}`,
+      `Lieu exact : ${studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'}`,
       adminDecisionNote ? `Mot du studio : ${adminDecisionNote}` : null,
       ``,
       `Pour toute question ou réajustement, contactez-nous sur Instagram : ${studio.config.handle} (${studio.config.instagramUrl})`,
@@ -1329,17 +1349,17 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
         ['Options', updated.addonNames.length > 0 ? updated.addonNames.join(', ') : 'Aucune'],
         ['Date confirmée', formatDateFr(updated.preferredDate)],
         ['Heure confirmée', updated.preferredTime],
-        ['Lieu', studio.config.locationLine],
+        ['Lieu du rendez-vous', studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'],
       ],
       totalLabel: 'Tarif estimé',
       totalValue: `${updated.totalPrice} €`,
       totalNote: updated.isSupplementApplied
         ? `Inclut +${updated.supplementPrice} € (${updated.supplementReason})`
         : 'Règlement au studio',
-      noteTitle: adminDecisionNote ? 'Mot du studio' : 'Préparation & consignes',
+      noteTitle: adminDecisionNote ? 'Mot du studio' : 'Adresse exacte & consignes',
       noteBody:
         adminDecisionNote ||
-        `Merci de respecter les consignes avant et après séance indiquées sur le site ou sur Instagram (${studio.config.handle}).`,
+        `Le studio se situe au ${studio.config.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon'}. Merci de vous présenter sans maquillage pour optimiser la pose.`,
       ctaLabel: `Voir ${studio.config.handle} sur Instagram`,
       ctaUrl: studio.config.instagramUrl,
       footer: `${studio.config.brandName} · ${studio.config.locationLine}`,

@@ -77,7 +77,8 @@ export interface StudioConfig {
   handle: string;
   instagramUrl: string;
   tagline: string;
-  locationLine: string;
+  locationLine: string; // Quartier/indication publique (ex: À deux pas de la Place Napoléon, La Roche-sur-Yon)
+  exactStudioAddress?: string; // Adresse privée envoyée UNIQUEMENT à la confirmation par l'administrateur
   city: string;
   certificationLine: string;
   heroTitle: string;

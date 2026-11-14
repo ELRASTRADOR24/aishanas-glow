@@ -2731,13 +2731,32 @@ export const AdminPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-taupe uppercase">Localisation</label>
+                  <label className="block text-[11px] text-taupe uppercase">
+                    Localisation publique (quartier / ville)
+                  </label>
                   <input
                     type="text"
                     value={data.config.locationLine}
                     onChange={(e) => updateConfig({ locationLine: e.target.value })}
+                    placeholder="Ex. À deux pas de la Place Napoléon, La Roche-sur-Yon"
                     className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
                   />
+                  <p className="mt-1 text-[10px] text-taupe">Affiché publiquement sur le site (Hero & Footer)</p>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-emerald-900 uppercase">
+                    Adresse exacte privée du studio (Confidentialité)
+                  </label>
+                  <input
+                    type="text"
+                    value={data.config.exactStudioAddress || ''}
+                    onChange={(e) => updateConfig({ exactStudioAddress: e.target.value })}
+                    placeholder="Ex. 2 rue du Général Gallieni, 85000 La Roche-sur-Yon"
+                    className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm bg-emerald-50/20"
+                  />
+                  <p className="mt-1 text-[10px] text-emerald-800">
+                    Masquée du site public · Envoyée UNIQUEMENT dans l'e-mail de confirmation après validation
+                  </p>
                 </div>
               </div>
 

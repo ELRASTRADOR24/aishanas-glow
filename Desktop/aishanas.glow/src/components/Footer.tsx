@@ -6,6 +6,18 @@ export const Footer: React.FC = () => {
   const { data } = useStudio();
   const { config } = data;
 
+  const handleNavAnchor = (hash: string) => (e: React.MouseEvent) => {
+    if (window.location.pathname === '/') {
+      e.preventDefault();
+      const id = hash.replace('#', '');
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+        window.history.pushState(null, '', `/#${id}`);
+      }
+    }
+  };
+
   return (
     <footer className="bg-obsidian px-4 py-12 text-stone sm:px-6">
       <div className="mx-auto flex max-w-5xl flex-col items-start justify-between gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-end">
@@ -26,13 +38,13 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-5 text-xs tracking-wider uppercase">
-          <Link to="/#tarifs" className="hover:text-ivory">
+          <Link to="/#tarifs" onClick={handleNavAnchor('#tarifs')} className="hover:text-ivory">
             Tarifs
           </Link>
-          <Link to="/#protocoles" className="hover:text-ivory">
+          <Link to="/#protocoles" onClick={handleNavAnchor('#protocoles')} className="hover:text-ivory">
             Protocoles
           </Link>
-          <Link to="/#faq" className="hover:text-ivory">
+          <Link to="/#faq" onClick={handleNavAnchor('#faq')} className="hover:text-ivory">
             FAQ
           </Link>
           <Link to="/reserver" className="hover:text-ivory text-ivory font-medium">

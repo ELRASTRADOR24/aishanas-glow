@@ -153,10 +153,10 @@ export const OptionConfirmationPage: React.FC = () => {
               </div>
 
               <div className="border border-charcoal/15 bg-ivory/40 p-4 text-xs text-charcoal/90">
-                <p className="font-semibold text-charcoal">Adresse du studio :</p>
-                <p className="mt-1">{data.config.locationLine}</p>
+                <p className="font-semibold text-charcoal">Consignes d'accès au studio :</p>
+                <p className="mt-1 text-taupe">{data.config.locationLine}</p>
                 <p className="mt-2 text-[11px] text-taupe">
-                  Un récapitulatif complet vient de vous être envoyé par e-mail.
+                  L’adresse exacte et les consignes complètes vous ont été envoyées dans votre e-mail de confirmation.
                 </p>
               </div>
 
