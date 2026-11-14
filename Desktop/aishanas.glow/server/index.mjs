@@ -219,6 +219,18 @@ function loadStudio() {
   const exactAddress =
     existingConfig.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon';
 
+  const sanitizedServices = (existing.services || DEFAULT_SERVER_STUDIO.services).map((s) => {
+    let duration = s.durationMinutes;
+    let active = s.active;
+    if (s.category === 'extensions') {
+      duration = 120;
+    }
+    if (s.category === 'blanchiment' && active !== false) {
+      active = false;
+    }
+    return { ...s, durationMinutes: duration, active };
+  });
+
   memoryStudio = {
     ...DEFAULT_SERVER_STUDIO,
     ...existing,
@@ -227,6 +239,12 @@ function loadStudio() {
       ...existingConfig,
       locationLine: safeLocation,
       exactStudioAddress: exactAddress,
+      tagline: existingConfig.tagline?.includes('Blanchiment')
+        ? 'Extensions de cils & Rehaussement de cils'
+        : existingConfig.tagline || DEFAULT_SERVER_STUDIO.config.tagline,
+      heroSubtitle: existingConfig.heroSubtitle?.toLowerCase().includes('blanchiment')
+        ? 'Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.'
+        : existingConfig.heroSubtitle || DEFAULT_SERVER_STUDIO.config.heroSubtitle,
       cloudinary: {
         ...DEFAULT_SERVER_STUDIO.config.cloudinary,
         ...(existingConfig.cloudinary || {}),
@@ -239,7 +257,7 @@ function loadStudio() {
         blockedSlots: existingConfig.bookingRules?.blockedSlots || [],
       },
     },
-    services: existing.services || DEFAULT_SERVER_STUDIO.services,
+    services: sanitizedServices,
     addons: existing.addons || DEFAULT_SERVER_STUDIO.addons,
     protocols: existing.protocols || DEFAULT_SERVER_STUDIO.protocols,
     media: existing.media || [],
@@ -779,16 +797,38 @@ function buildPublicStudio(studio) {
     ? 'À deux pas de la Place Napoléon, La Roche-sur-Yon'
     : safeConfig.locationLine || 'À deux pas de la Place Napoléon, La Roche-sur-Yon';
 
+  const publicTagline = safeConfig.tagline?.includes('Blanchiment')
+    ? 'Extensions de cils & Rehaussement de cils'
+    : safeConfig.tagline || 'Extensions de cils & Rehaussement de cils';
+
+  const publicHeroSubtitle = safeConfig.heroSubtitle?.toLowerCase().includes('blanchiment')
+    ? 'Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.'
+    : safeConfig.heroSubtitle;
+
+  const publicServices = (studio.services || []).map((s) => {
+    if (s.category === 'extensions') {
+      return { ...s, durationMinutes: 120 };
+    }
+    if (s.category === 'blanchiment') {
+      return { ...s, active: false };
+    }
+    return s;
+  });
+
   return {
     config: {
       ...safeConfig,
+      tagline: publicTagline,
+      heroSubtitle: publicHeroSubtitle,
       locationLine: publicLocation,
       exactStudioAddress: '',
       adminPasscode: '',
     },
-    services: studio.services,
+    services: publicServices,
     addons: studio.addons,
-    protocols: studio.protocols,
+    protocols: (studio.protocols || []).filter(
+      (p) => p.group !== 'blanchiment' || publicServices.some((s) => s.category === 'blanchiment' && s.active)
+    ),
     media: studio.media,
     bookings: [],
     occupiedSlots,

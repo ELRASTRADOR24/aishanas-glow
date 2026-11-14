@@ -88,10 +88,22 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
       ? 'À deux pas de la Place Napoléon, La Roche-sur-Yon'
       : rawLocation;
 
+  const rawTagline = raw.config?.tagline || DEFAULT_STUDIO_DATA.config.tagline;
+  const safeTagline = rawTagline.includes('Blanchiment')
+    ? 'Extensions de cils & Rehaussement de cils'
+    : rawTagline;
+
+  const rawSubtitle = raw.config?.heroSubtitle || DEFAULT_STUDIO_DATA.config.heroSubtitle;
+  const safeSubtitle = rawSubtitle.toLowerCase().includes('blanchiment')
+    ? 'Extensions de cils et rehaussement soin profond à La Roche-sur-Yon. Consultez la carte des prestations et réservez votre créneau directement en ligne.'
+    : rawSubtitle;
+
   return {
     config: {
       ...DEFAULT_STUDIO_DATA.config,
       ...(raw.config ?? {}),
+      tagline: safeTagline,
+      heroSubtitle: safeSubtitle,
       locationLine: safeLocation,
       showServiceImages: raw.config?.showServiceImages ?? true,
       cloudinary: {
@@ -109,6 +121,8 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
     },
     services: (raw.services ?? DEFAULT_STUDIO_DATA.services).map((s) => ({
       ...s,
+      durationMinutes: s.category === 'extensions' ? 120 : s.durationMinutes,
+      active: s.category === 'blanchiment' ? (s.active === true ? false : s.active ?? false) : s.active ?? true,
       showImage: s.showImage ?? true,
     })),
     addons: raw.addons ?? DEFAULT_STUDIO_DATA.addons,
@@ -135,7 +149,12 @@ function getInitialStudioData(): StudioData {
     if (raw) {
       const parsed = JSON.parse(raw);
       const normalized = normalizeStudio(parsed);
-      if (raw.includes('Gallieni') || raw.includes('rue du Général')) {
+      if (
+        raw.includes('Gallieni') ||
+        raw.includes('rue du Général') ||
+        raw.includes('Blanchiment dentaire') ||
+        raw.includes('Ultra-White')
+      ) {
         try {
           window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
         } catch {}
