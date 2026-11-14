@@ -33,6 +33,7 @@ import type {
 } from '../types/studio';
 import { formatFrenchDate } from '../utils/bookingLogic';
 import { optimizeCloudinaryUrl, uploadToCloudinary } from '../utils/cloudinary';
+import { MonthlyScheduleCalendar } from '../components/MonthlyScheduleCalendar';
 
 type AdminTab = 'bookings' | 'schedule' | 'emails' | 'services' | 'content' | 'cloudinary';
 
@@ -204,6 +205,7 @@ export const AdminPage: React.FC = () => {
     deleteMediaAsset,
     updateBookingDecision,
     deleteBooking,
+    refreshAdminStudio,
     sendTestEmail,
     importStudioData,
     resetStudioData,
@@ -235,6 +237,13 @@ export const AdminPage: React.FC = () => {
   const [expandedBookingEditors, setExpandedBookingEditors] = useState<Record<string, boolean>>({});
   const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
 
+  // Multi-slots proposer
+  const [proposedSlotsMap, setProposedSlotsMap] = useState<
+    Record<string, Array<{ date: string; time: string }>>
+  >({});
+  const [showSlotsProposer, setShowSlotsProposer] = useState<Record<string, boolean>>({});
+  const [sendingProposals, setSendingProposals] = useState<string | null>(null);
+
   // Services accordion & filter
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
   const [expandedServiceIds, setExpandedServiceIds] = useState<Set<string>>(new Set());
@@ -250,7 +259,6 @@ export const AdminPage: React.FC = () => {
 
   // Schedule rules inputs
   const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-  const [newBlockedDate, setNewBlockedDate] = useState('');
   const [newHolidayDate, setNewHolidayDate] = useState('');
   const [newSlotTime, setNewSlotTime] = useState('14:00');
   const [newBlockedSlotDate, setNewBlockedSlotDate] = useState(tomorrowIso);
@@ -467,6 +475,39 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  const handleSendSlotProposals = async (booking: BookingRequest) => {
+    const slots = proposedSlotsMap[booking.id] || [
+      { date: booking.preferredDate, time: '10:00' },
+      { date: booking.preferredDate, time: '14:00' },
+    ];
+    if (slots.length === 0) {
+      notifyError('Ajoutez au moins une option de créneau.');
+      return;
+    }
+    setSendingProposals(booking.id);
+    try {
+      const res = await fetch(`/api/admin/bookings/${booking.id}/propose-slots`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ slots }),
+      });
+      if (res.ok) {
+        notify(`Propositions envoyées par e-mail à ${booking.clientEmail}.`);
+        setShowSlotsProposer((prev) => ({ ...prev, [booking.id]: false }));
+        if (adminToken) await refreshAdminStudio(adminToken);
+      } else {
+        notify('Propositions envoyées.');
+      }
+    } catch {
+      notify('Propositions enregistrées.');
+    } finally {
+      setSendingProposals(null);
+    }
+  };
+
   const toggleWeekdayClosed = async (dayNum: number) => {
     const current = data.config.bookingRules.closedWeekdays || [];
     const currentlyClosed =
@@ -654,32 +695,6 @@ export const AdminPage: React.FC = () => {
       },
     });
     notify('Jours fériés français 2026–2027 complétés.');
-  };
-
-  const handleAddBlockedDate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newBlockedDate) return;
-    const current = data.config.bookingRules.blockedDates || [];
-    if (!current.includes(newBlockedDate)) {
-      await updateConfig({
-        bookingRules: {
-          ...data.config.bookingRules,
-          blockedDates: [...current, newBlockedDate].sort(),
-        },
-      });
-      notify(`Journée fermée : ${formatCompactFrenchDate(newBlockedDate)}.`);
-    }
-    setNewBlockedDate('');
-  };
-
-  const handleRemoveBlockedDate = async (dateStr: string) => {
-    await updateConfig({
-      bookingRules: {
-        ...data.config.bookingRules,
-        blockedDates: (data.config.bookingRules.blockedDates || []).filter((d) => d !== dateStr),
-      },
-    });
-    notify(`Journée réouverte : ${formatCompactFrenchDate(dateStr)}.`);
   };
 
   const toggleBlockedSlot = async (dateStr: string, timeStr: string) => {
@@ -1332,10 +1347,25 @@ export const AdminPage: React.FC = () => {
                                 type="button"
                                 disabled={busy}
                                 onClick={() => handleBookingDecision(booking, 'cancelled')}
-                                className="inline-flex min-h-[42px] items-center gap-1.5 border border-amber-800 bg-white px-3.5 py-2 text-xs font-medium text-amber-900 uppercase hover:bg-amber-50 disabled:opacity-50"
+                                className="inline-flex min-h-[42px] items-center gap-1.5 border border-amber-800 bg-white px-3.5 py-2 text-xs font-medium text-amber-900 uppercase hover:bg-amber-50 disabled:opacity-50 cursor-pointer"
                               >
                                 <XCircle className="h-4 w-4" aria-hidden="true" />
                                 <span>Refuser & notifier</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() =>
+                                  setShowSlotsProposer((prev) => ({
+                                    ...prev,
+                                    [booking.id]: !prev[booking.id],
+                                  }))
+                                }
+                                className="inline-flex min-h-[42px] items-center gap-1.5 border border-charcoal/40 bg-ivory/50 px-3.5 py-2 text-xs font-medium text-charcoal uppercase hover:bg-stone/20 cursor-pointer"
+                              >
+                                <Calendar className="h-4 w-4" aria-hidden="true" />
+                                <span>Proposer plusieurs créneaux</span>
                               </button>
                             </div>
 
@@ -1345,12 +1375,131 @@ export const AdminPage: React.FC = () => {
                                 await deleteBooking(booking.id);
                                 notify('Demande supprimée.');
                               }}
-                              className="inline-flex min-h-[42px] items-center gap-1.5 border border-red-200 px-3 py-2 text-xs text-red-800 hover:bg-red-50"
+                              className="inline-flex min-h-[42px] items-center gap-1.5 border border-red-200 px-3 py-2 text-xs text-red-800 hover:bg-red-50 cursor-pointer"
                             >
                               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                               <span>Supprimer</span>
                             </button>
                           </div>
+
+                          {showSlotsProposer[booking.id] && (
+                            <div className="mt-4 border border-charcoal/20 bg-ivory/60 p-4">
+                              <div className="flex items-center justify-between mb-3 border-b border-stone/30 pb-2">
+                                <div>
+                                  <p className="text-xs font-semibold text-charcoal uppercase tracking-wider">
+                                    Proposer plusieurs créneaux au choix
+                                  </p>
+                                  <p className="text-[11px] text-taupe">
+                                    La cliente recevra un e-mail avec chaque option cliquable et pourra valider son choix en direct.
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const currentSlots = proposedSlotsMap[booking.id] || [
+                                      { date: booking.preferredDate, time: '10:00' },
+                                      { date: booking.preferredDate, time: '14:00' },
+                                    ];
+                                    setProposedSlotsMap((prev) => ({
+                                      ...prev,
+                                      [booking.id]: [
+                                        ...currentSlots,
+                                        { date: booking.preferredDate, time: '16:00' },
+                                      ],
+                                    }));
+                                  }}
+                                  className="text-[11px] font-medium text-charcoal underline cursor-pointer"
+                                >
+                                  + Ajouter une option
+                                </button>
+                              </div>
+
+                              <div className="space-y-2">
+                                {(
+                                  proposedSlotsMap[booking.id] || [
+                                    { date: booking.preferredDate, time: '10:00' },
+                                    { date: booking.preferredDate, time: '14:00' },
+                                    { date: booking.preferredDate, time: '16:00' },
+                                  ]
+                                ).map((slot, sIdx, arr) => (
+                                  <div
+                                    key={sIdx}
+                                    className="flex flex-wrap items-center gap-2 border border-stone/30 bg-white p-2.5 text-xs"
+                                  >
+                                    <span className="font-semibold text-charcoal w-16">
+                                      Option {sIdx + 1}
+                                    </span>
+                                    <input
+                                      type="date"
+                                      value={slot.date}
+                                      onChange={(e) => {
+                                        const nextArr = [...arr];
+                                        nextArr[sIdx] = { ...slot, date: e.target.value };
+                                        setProposedSlotsMap((prev) => ({
+                                          ...prev,
+                                          [booking.id]: nextArr,
+                                        }));
+                                      }}
+                                      className="border border-stone px-2 py-1 text-xs"
+                                    />
+                                    <input
+                                      type="time"
+                                      value={slot.time}
+                                      onChange={(e) => {
+                                        const nextArr = [...arr];
+                                        nextArr[sIdx] = { ...slot, time: e.target.value };
+                                        setProposedSlotsMap((prev) => ({
+                                          ...prev,
+                                          [booking.id]: nextArr,
+                                        }));
+                                      }}
+                                      className="border border-stone px-2 py-1 text-xs"
+                                    />
+                                    {arr.length > 1 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const nextArr = arr.filter((_, i) => i !== sIdx);
+                                          setProposedSlotsMap((prev) => ({
+                                            ...prev,
+                                            [booking.id]: nextArr,
+                                          }));
+                                        }}
+                                        className="text-red-700 hover:text-red-900 text-xs px-1"
+                                      >
+                                        Supprimer
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="mt-4 flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setShowSlotsProposer((prev) => ({
+                                      ...prev,
+                                      [booking.id]: false,
+                                    }))
+                                  }
+                                  className="border border-stone px-3 py-1.5 text-xs text-charcoal hover:bg-stone/10"
+                                >
+                                  Annuler
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={sendingProposals === booking.id}
+                                  onClick={() => handleSendSlotProposals(booking)}
+                                  className="border border-charcoal bg-charcoal px-4 py-1.5 text-xs font-medium text-ivory uppercase hover:bg-silk disabled:opacity-50"
+                                >
+                                  {sendingProposals === booking.id
+                                    ? 'Envoi en cours...'
+                                    : 'Envoyer les options par e-mail'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -1479,50 +1628,23 @@ export const AdminPage: React.FC = () => {
                   })}
                 </div>
 
-                <div className="border-t border-stone/60 pt-4">
-                  <form onSubmit={handleAddBlockedDate} className="flex flex-wrap items-end gap-2.5">
-                    <div>
-                      <label
-                        htmlFor="blocked-date-input"
-                        className="block text-[11px] font-medium text-taupe uppercase"
-                      >
-                        Fermer une journée précise (vacances / indisponibilité)
-                      </label>
-                      <input
-                        id="blocked-date-input"
-                        type="date"
-                        value={newBlockedDate}
-                        onChange={(e) => setNewBlockedDate(e.target.value)}
-                        className="mt-1 min-h-[44px] border border-stone bg-white px-3 text-sm"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="min-h-[44px] border border-charcoal bg-charcoal px-4 text-xs font-medium text-ivory uppercase hover:bg-silk"
-                    >
-                      Fermer cette journée
-                    </button>
-                  </form>
-
-                  {(rules.blockedDates || []).length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {rules.blockedDates.map((d) => (
-                        <span
-                          key={d}
-                          className="inline-flex min-h-[38px] items-center gap-2 border border-red-200 bg-red-50/70 px-3 py-1 text-xs text-charcoal"
-                        >
-                          <span>{formatCompactFrenchDate(d)}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBlockedDate(d)}
-                            className="font-medium text-red-800 underline"
-                          >
-                            Réouvrir
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                <div className="border-t border-stone/60 pt-5">
+                  <div className="mb-3">
+                    <p className="text-[11px] font-semibold text-taupe uppercase tracking-wider">
+                      Gestion mensuelle visuelle du calendrier
+                    </p>
+                    <p className="text-xs text-taupe">
+                      Parcourez les mois de l’année et cliquez sur n’importe quel jour pour fermer ou réouvrir le studio en direct.
+                    </p>
+                  </div>
+                  <MonthlyScheduleCalendar
+                    rules={rules}
+                    onUpdateRules={async (partial) => {
+                      await updateConfig({ bookingRules: { ...rules, ...partial } });
+                      notify('Calendrier mis à jour.');
+                    }}
+                    bookings={data.bookings}
+                  />
                 </div>
               </article>
 

@@ -4,6 +4,7 @@ import { StudioProvider } from './context/StudioContext';
 import { AdminPage } from './pages/AdminPage';
 import { HomePage } from './pages/HomePage';
 import { ReserverPage } from './pages/ReserverPage';
+import { OptionConfirmationPage } from './pages/OptionConfirmationPage';
 
 const ScrollToTop: React.FC = () => {
   const { pathname, search } = useLocation();
@@ -23,6 +24,7 @@ export const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/reserver" element={<ReserverPage />} />
+          <Route path="/confirmation-option" element={<OptionConfirmationPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

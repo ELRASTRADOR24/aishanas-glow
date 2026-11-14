@@ -386,6 +386,36 @@
   "bookings": [],
   "emailLogs": [
     {
+      "id": "mail-1794628078011-559",
+      "createdAt": "2026-11-14T03:47:58.011Z",
+      "to": "maydiesoums@gmail.com",
+      "subject": "[Alshana's Glow] Votre rendez-vous est confirmé — jeudi 26 novembre 2026 à 14:30",
+      "kind": "client_confirmed",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d82b-4a08-72d8-9c6e-70ab7d1c09e3) vers maydiesoums@gmail.com.",
+      "previewText": "Bonjour Maydie ntary,\nVotre rendez-vous pour Pose mixte (cil à cil + 4D) est validé pour le jeudi 26 novembre 2026 à 14:30 au 2 rue du Général Gallieni, 85000 La Roche-sur-Yon.\nÀ très vite au studio !"
+    },
+    {
+      "id": "mail-1794628077577-826",
+      "createdAt": "2026-11-14T03:47:57.577Z",
+      "to": "alshanasglow@gmail.com",
+      "subject": "[Alshana's Glow] Option validée par la cliente (AG-2662) — Maydie ntary",
+      "kind": "admin_alert",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d82b-48e8-7296-a6cc-80de83f594a6) vers alshanasglow@gmail.com.",
+      "previewText": "La cliente Maydie ntary a validé son créneau pour le jeudi 26 novembre 2026 à 14:30.\nPrestation : Pose mixte (cil à cil + 4D)\nVoir l’administration : https://aishanas-glow.vercel.app/admin"
+    },
+    {
+      "id": "mail-1794627952271-85",
+      "createdAt": "2026-11-14T03:45:52.271Z",
+      "to": "alshanasglow@gmail.com",
+      "subject": "[Alshana's Glow] Nouvelle demande à valider (AG-2662) — Maydie ntary",
+      "kind": "admin_alert",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d829-5f47-77ca-89f1-d88edeed1145) vers alshanasglow@gmail.com.",
+      "previewText": "Nouvelle demande de rendez-vous sur Alshana's Glow\nRéférence : AG-2662\nCliente : Maydie ntary\nE-mail cliente : maydiesoums@gmail.com\nTéléphone : +33767663869\nInstagram : @maydie_82\nPrestation : Pose mixte (cil à cil + 4D) (Pose complète)\nDate demandée : mercredi 25 novembre 2026\nHeure demandée : 14:00\nTotal estimé : 45 €\nPrécisions : Je suis très sensible des yeux\nValidez ou ajustez ce créneau dans l’administration : http://localhost:5173/admin"
+    },
+    {
       "id": "mail-1794625066606-579",
       "createdAt": "2026-11-14T02:57:46.606Z",
       "to": "alshanasglow@gmail.com",

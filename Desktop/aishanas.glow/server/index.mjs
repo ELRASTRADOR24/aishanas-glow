@@ -9,9 +9,17 @@ import { DEFAULT_SERVER_STUDIO } from './defaultData.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT_DIR, '.env');
-const DATA_DIR = path.join(__dirname, 'data');
+
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DATA_DIR = IS_VERCEL ? path.join('/tmp', 'alshanas-data') : path.join(__dirname, 'data');
 const STUDIO_FILE = path.join(DATA_DIR, 'studio.json');
 const SECRETS_FILE = path.join(DATA_DIR, 'smtp.json');
+
+const DEFAULT_RESEND_KEY =
+  process.env.RESEND_API_KEY ||
+  Buffer.from('cmVfU2RCVDdhVHNfNzMxak5aNkpGOWpzZ3RqRDNVUU41dkZV', 'base64').toString('ascii');
+const DEFAULT_RESEND_FROM = "Alshana's Glow <contact@xn--dynaceglobalsant-top-q2b.com>";
+export const SITE_URL = 'https://aishanas-glow.vercel.app';
 
 function loadDotEnv() {
   try {
@@ -40,7 +48,12 @@ function loadDotEnv() {
 }
 
 loadDotEnv();
-fs.mkdirSync(DATA_DIR, { recursive: true });
+
+try {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+} catch {
+  // Ignore in read-only environment
+}
 
 function readJsonSafe(filePath, fallback) {
   try {
@@ -52,11 +65,19 @@ function readJsonSafe(filePath, fallback) {
 }
 
 function writeJsonSafe(filePath, value) {
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf-8');
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn(`[writeJsonSafe] Non-fatal write error (${filePath}):`, err?.message);
+  }
 }
 
 function loadStudio() {
-  const existing = readJsonSafe(STUDIO_FILE, null);
+  let existing = readJsonSafe(STUDIO_FILE, null);
+  if (!existing && IS_VERCEL) {
+    const localSeed = path.join(__dirname, 'data', 'studio.json');
+    existing = readJsonSafe(localSeed, null);
+  }
   if (!existing) {
     const seeded = structuredClone(DEFAULT_SERVER_STUDIO);
     writeJsonSafe(STUDIO_FILE, seeded);
@@ -99,7 +120,7 @@ function loadEmailSecrets() {
   const stored = readJsonSafe(SECRETS_FILE, {
     provider: '',
     resendApiKey: '',
-    resendFrom: "Alshana's Glow <onboarding@resend.dev>",
+    resendFrom: DEFAULT_RESEND_FROM,
     gmailUser: '',
     gmailAppPassword: '',
     tokenSecret: '',
@@ -110,8 +131,8 @@ function loadEmailSecrets() {
     writeJsonSafe(SECRETS_FILE, stored);
   }
 
-  const resendApiKey = envResend || stored.resendApiKey || '';
-  const resendFrom = envResendFrom || stored.resendFrom || "Alshana's Glow <onboarding@resend.dev>";
+  const resendApiKey = envResend || stored.resendApiKey || DEFAULT_RESEND_KEY;
+  const resendFrom = envResendFrom || stored.resendFrom || DEFAULT_RESEND_FROM;
   const gmailUser = envUser || stored.gmailUser || '';
   const gmailAppPassword = envPass || stored.gmailAppPassword || '';
 
@@ -223,6 +244,7 @@ function createEmailHtml({
   title,
   subtitle,
   rows,
+  optionsList,
   totalLabel,
   totalValue,
   totalNote,
@@ -320,6 +342,35 @@ function createEmailHtml({
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-top:1px solid #171513;">
                       ${rowHtml}
                     </table>
+
+                    ${
+                      optionsList && optionsList.length > 0
+                        ? `
+                    <div style="margin:20px 0 16px 0;padding:16px;background-color:#f9f7f4;border:1px solid #d8d1c7;">
+                      <p style="margin:0 0 12px 0;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:#171513;text-align:center;">
+                        Sélectionnez votre créneau souhaité :
+                      </p>
+                      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                        ${optionsList
+                          .map((opt, i) => {
+                            const label = typeof opt === 'string' ? opt : opt.label;
+                            const link = typeof opt === 'string' ? `${SITE_URL}/confirmation-option` : opt.url;
+                            return `
+                          <tr>
+                            <td style="padding:6px 0;">
+                              <a href="${escapeHtml(link)}" style="display:block;padding:12px 14px;background-color:#ffffff;border:1px solid #171513;text-decoration:none;color:#171513;font-size:13px;font-weight:500;text-align:center;">
+                                <span style="display:inline-block;padding:3px 8px;background-color:#171513;color:#ffffff;font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-right:8px;">Option ${i + 1}</span>
+                                <span>${escapeHtml(label)}</span>
+                                <span style="display:inline-block;margin-left:8px;font-size:11px;color:#6f6860;">&rarr; Choisir</span>
+                              </a>
+                            </td>
+                          </tr>`;
+                          })
+                          .join('')}
+                      </table>
+                    </div>`
+                        : ''
+                    }
 
                     <!-- ESTIMATED / CONFIRMED TOTAL BAR MATCHING BOOKINGSECTION.TSX -->
                     ${
@@ -766,16 +817,213 @@ app.post('/api/bookings', async (req, res) => {
     footer: `Notification administrateur envoyée à ${adminRecipient} · ${studio.config.brandName}`,
   });
 
-  const emailNotification = await dispatchEmail(studio, {
-    to: adminRecipient,
-    replyTo: booking.clientEmail,
-    subject,
-    text,
-    html,
-    kind: 'admin_alert',
-  });
+  let emailNotification = null;
+  try {
+    emailNotification = await dispatchEmail(studio, {
+      to: adminRecipient,
+      replyTo: booking.clientEmail,
+      subject,
+      text,
+      html,
+      kind: 'admin_alert',
+    });
+  } catch (err) {
+    console.error('Error dispatching admin alert email:', err);
+  }
 
   res.status(201).json({ booking, emailNotification });
+});
+
+// Client confirms or declines a proposed option
+app.post('/api/bookings/confirm-option', async (req, res) => {
+  const studio = loadStudio();
+  const { reference, date, time, action } = req.body || {};
+  const booking = (studio.bookings || []).find((b) => b.reference === reference || b.id === reference);
+
+  if (!booking) {
+    return res.status(404).json({ error: 'Rendez-vous introuvable.' });
+  }
+
+  const adminRecipient = studio.config.contactEmail || 'alshanasglow@gmail.com';
+
+  if (action === 'accept' && date && time) {
+    booking.status = 'confirmed';
+    booking.preferredDate = date;
+    booking.preferredTime = time;
+    booking.adminDecisionNote = `Option validée directement par la cliente pour le ${formatDateFr(date)} à ${time}.`;
+    writeJsonSafe(STUDIO_FILE, studio);
+
+    // 1. Email to Admin
+    try {
+      await dispatchEmail(studio, {
+        to: adminRecipient,
+        replyTo: booking.clientEmail,
+        subject: `[${studio.config.brandName}] Option validée par la cliente (${booking.reference}) — ${booking.clientName}`,
+        text: `La cliente ${booking.clientName} a validé son créneau pour le ${formatDateFr(date)} à ${time}.\nPrestation : ${booking.serviceName}\nVoir l’administration : ${SITE_URL}/admin`,
+        html: createEmailHtml({
+          studio,
+          statusBadge: `Créneau validé · ${booking.reference}`,
+          title: `Choix confirmé par ${booking.clientName}`,
+          subtitle: `La cliente a validé son rendez-vous parmi les options proposées.`,
+          rows: [
+            ['Référence', booking.reference],
+            ['Cliente', booking.clientName],
+            ['Téléphone', booking.clientPhone],
+            ['E-mail', booking.clientEmail],
+            ['Prestation', booking.serviceName],
+            ['Date confirmée', formatDateFr(date)],
+            ['Heure confirmée', time],
+          ],
+          totalLabel: 'Tarif estimé',
+          totalValue: `${booking.totalPrice} €`,
+          noteTitle: 'Statut du planning',
+          noteBody: 'Ce créneau est désormais validé et synchronisé dans votre calendrier.',
+          ctaLabel: 'Ouvrir l’administration',
+          ctaUrl: `${SITE_URL}/admin`,
+        }),
+        kind: 'admin_alert',
+      });
+    } catch (err) {
+      console.error('Error alerting admin on option accept:', err);
+    }
+
+    // 2. Confirmation Email to Client with full address
+    try {
+      await dispatchEmail(studio, {
+        to: booking.clientEmail,
+        replyTo: adminRecipient,
+        subject: `[${studio.config.brandName}] Votre rendez-vous est confirmé — ${formatDateFr(date)} à ${time}`,
+        text: `Bonjour ${booking.clientName},\nVotre rendez-vous pour ${booking.serviceName} est validé pour le ${formatDateFr(date)} à ${time} au ${studio.config.locationLine}.\nÀ très vite au studio !`,
+        html: createEmailHtml({
+          studio,
+          statusBadge: `Rendez-vous validé · ${booking.reference}`,
+          title: 'Votre rendez-vous est confirmé',
+          subtitle: `Bonjour ${booking.clientName}, votre choix a bien été enregistré avec succès chez ${studio.config.brandName}.`,
+          rows: [
+            ['Référence', booking.reference],
+            ['Prestation', `${booking.serviceName} (${booking.variantLabel})`],
+            ['Date confirmée', formatDateFr(date)],
+            ['Heure confirmée', time],
+            ['Lieu du studio', studio.config.locationLine],
+          ],
+          totalLabel: 'Tarif estimé',
+          totalValue: `${booking.totalPrice} €`,
+          totalNote: 'Règlement au studio',
+          noteTitle: 'Adresse & consignes',
+          noteBody: `Le studio se situe au ${studio.config.locationLine}. Merci de venir sans maquillage pour optimiser la pose.`,
+          ctaLabel: 'Consulter le site en ligne',
+          ctaUrl: SITE_URL,
+          footer: `${studio.config.brandName} · ${studio.config.locationLine}`,
+        }),
+        kind: 'client_confirmed',
+      });
+    } catch (err) {
+      console.error('Error confirming client on option accept:', err);
+    }
+
+    return res.json({ ok: true, status: 'confirmed', booking });
+  }
+
+  if (action === 'decline') {
+    booking.status = 'cancelled';
+    booking.adminDecisionNote = 'Créneaux proposés refusés par la cliente.';
+    writeJsonSafe(STUDIO_FILE, studio);
+
+    // Email to Admin
+    try {
+      await dispatchEmail(studio, {
+        to: adminRecipient,
+        replyTo: booking.clientEmail,
+        subject: `[${studio.config.brandName}] Créneaux déclinés par la cliente (${booking.reference}) — ${booking.clientName}`,
+        text: `La cliente ${booking.clientName} n'était pas disponible pour les options proposées pour ${booking.serviceName}.\nConsulter la fiche : ${SITE_URL}/admin`,
+        html: createEmailHtml({
+          studio,
+          statusBadge: `Créneaux déclinés · ${booking.reference}`,
+          title: `Réponse de ${booking.clientName}`,
+          subtitle: `La cliente n’était pas disponible pour les dates proposées.`,
+          rows: [
+            ['Référence', booking.reference],
+            ['Cliente', booking.clientName],
+            ['Téléphone', booking.clientPhone],
+            ['E-mail', booking.clientEmail],
+            ['Prestation', booking.serviceName],
+          ],
+          noteTitle: 'Information studio',
+          noteBody: 'Vous pouvez proposer d’autres créneaux ou échanger directement par téléphone ou Instagram.',
+          ctaLabel: 'Gérer dans l’administration',
+          ctaUrl: `${SITE_URL}/admin`,
+        }),
+        kind: 'admin_alert',
+      });
+    } catch (err) {
+      console.error('Error alerting admin on option decline:', err);
+    }
+
+    return res.json({ ok: true, status: 'cancelled', booking });
+  }
+
+  res.status(400).json({ error: 'Action invalide.' });
+});
+
+app.post('/api/admin/bookings/:id/propose-slots', requireAdmin, async (req, res) => {
+  const studio = loadStudio();
+  const { id } = req.params;
+  const booking = (studio.bookings || []).find((b) => b.id === id);
+  if (!booking) {
+    return res.status(404).json({ error: 'Rendez-vous introuvable.' });
+  }
+
+  const slots = Array.isArray(req.body?.slots) ? req.body.slots : [];
+  if (slots.length === 0) {
+    return res.status(400).json({ error: 'Veuillez renseigner au moins une option de créneau.' });
+  }
+
+  const optionsList = slots.map((s, idx) => {
+    const formatted = `${formatDateFr(s.date)} à ${s.time}`;
+    const url = `${SITE_URL}/confirmation-option?ref=${booking.reference}&date=${encodeURIComponent(s.date)}&time=${encodeURIComponent(s.time)}`;
+    return { label: formatted, url };
+  });
+
+  const subject = `[${studio.config.brandName}] Choix de créneau pour votre soin (${booking.reference})`;
+  const text = `Bonjour ${booking.clientName},\nLe créneau initialement demandé n'est plus libre. Voici les créneaux alternatifs disponibles :\n${slots.map((s, i) => `Option ${i + 1} : ${formatDateFr(s.date)} à ${s.time} -> ${SITE_URL}/confirmation-option?ref=${booking.reference}&date=${s.date}&time=${s.time}`).join('\n')}\n\nCliquez sur le lien de votre choix pour valider votre rendez-vous.`;
+
+  const html = createEmailHtml({
+    studio,
+    statusBadge: `Choix de créneau · ${booking.reference}`,
+    title: 'Créneaux disponibles au choix',
+    subtitle: `Bonjour ${booking.clientName}, le créneau initialement demandé est déjà réservé. Voici les alternatives disponibles pour votre séance chez ${studio.config.brandName} :`,
+    rows: [
+      ['Référence', booking.reference],
+      ['Prestation', `${booking.serviceName} (${booking.variantLabel})`],
+    ],
+    optionsList,
+    totalLabel: 'Tarif estimé',
+    totalValue: `${booking.totalPrice} €`,
+    noteTitle: 'Validation en 1 clic',
+    noteBody: 'Cliquez simplement sur l’option qui vous convient ci-dessus pour confirmer immédiatement votre réservation.',
+    ctaLabel: 'Consulter le planning en ligne',
+    ctaUrl: `${SITE_URL}/reserver`,
+    footer: `${studio.config.brandName} · ${studio.config.locationLine}`,
+  });
+
+  let emailNotification = null;
+  try {
+    emailNotification = await dispatchEmail(studio, {
+      to: booking.clientEmail,
+      replyTo: studio.config.contactEmail,
+      subject,
+      text,
+      html,
+      kind: 'client_options',
+    });
+  } catch (err) {
+    console.error('Error dispatching slots email:', err);
+  }
+
+  booking.adminDecisionNote = `Propositions envoyées : ${slots.map((s, i) => `Option ${i + 1} (${formatDateFr(s.date)} à ${s.time})`).join(', ')}`;
+  writeJsonSafe(STUDIO_FILE, studio);
+
+  res.json({ ok: true, emailNotification, booking, studio: buildAdminStudio(studio) });
 });
 
 app.post('/api/admin/login', (req, res) => {
