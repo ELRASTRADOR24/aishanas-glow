@@ -11,6 +11,34 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT_DIR, '.env');
 
+function loadDotEnv() {
+  try {
+    if (!fs.existsSync(ENV_FILE)) return;
+    const raw = fs.readFileSync(ENV_FILE, 'utf-8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx <= 0) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // Ignore malformed .env
+  }
+}
+
+loadDotEnv();
+
 const IS_VERCEL = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME);
 const DATA_DIR = IS_VERCEL || !fs.existsSync(path.join(__dirname, 'data'))
   ? path.join('/tmp', 'alshanas-data')
@@ -18,15 +46,11 @@ const DATA_DIR = IS_VERCEL || !fs.existsSync(path.join(__dirname, 'data'))
 const STUDIO_FILE = path.join(DATA_DIR, 'studio.json');
 const SECRETS_FILE = path.join(DATA_DIR, 'smtp.json');
 
-const DEFAULT_RESEND_KEY =
-  process.env.RESEND_API_KEY ||
-  Buffer.from('cmVfU2RCVDdhVHNfNzMxak5aNkpGOWpzZ3RqRDNVUU41dkZV', 'base64').toString('ascii');
-const DEFAULT_RESEND_FROM = "Alshana's Glow <contact@xn--dynaceglobalsant-top-q2b.com>";
+const DEFAULT_RESEND_KEY = process.env.RESEND_API_KEY || '';
+const DEFAULT_RESEND_FROM = process.env.RESEND_FROM || "Alshana's Glow <contact@xn--dynaceglobalsant-top-q2b.com>";
 export const SITE_URL = 'https://aishanas-glow.vercel.app';
 
-const MONGODB_URI =
-  process.env.MONGODB_URI ||
-  'mongodb+srv://admin:4aOH4utY2gJM6q4H@cluster0.tmgtwyi.mongodb.net/alshanas_glow?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI?.trim() || '';
 
 // MongoDB / Mongoose persistent schemas
 const StudioDocSchema = new mongoose.Schema(
@@ -78,6 +102,9 @@ let isMongoConnected = false;
 let mongoConnPromise = null;
 
 async function getMongoConnection() {
+  if (!MONGODB_URI) {
+    return false;
+  }
   if (isMongoConnected && mongoose.connection.readyState === 1) return true;
   if (mongoConnPromise) return mongoConnPromise;
 
@@ -103,36 +130,10 @@ async function getMongoConnection() {
   return mongoConnPromise;
 }
 
-// Background initial connect
-getMongoConnection().catch(() => {});
-
-function loadDotEnv() {
-  try {
-    if (!fs.existsSync(ENV_FILE)) return;
-    const raw = fs.readFileSync(ENV_FILE, 'utf-8');
-    for (const line of raw.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx <= 0) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      let val = trimmed.slice(eqIdx + 1).trim();
-      if (
-        (val.startsWith('"') && val.endsWith('"')) ||
-        (val.startsWith("'") && val.endsWith("'"))
-      ) {
-        val = val.slice(1, -1);
-      }
-      if (!process.env[key]) {
-        process.env[key] = val;
-      }
-    }
-  } catch {
-    // Ignore malformed .env
-  }
+// Background initial connect if MONGODB_URI is set
+if (MONGODB_URI) {
+  getMongoConnection().catch(() => {});
 }
-
-loadDotEnv();
 
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true });
