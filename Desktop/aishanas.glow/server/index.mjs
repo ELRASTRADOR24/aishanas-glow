@@ -175,6 +175,27 @@ async function syncStudioFromMongo() {
       const merged = {
         ...DEFAULT_SERVER_STUDIO,
         ...doc.data,
+        config: {
+          ...DEFAULT_SERVER_STUDIO.config,
+          ...(doc.data.config || {}),
+          cloudinary: {
+            cloudName:
+              doc.data.config?.cloudinary?.cloudName ||
+              process.env.CLOUDINARY_CLOUD_NAME ||
+              process.env.VITE_CLOUDINARY_CLOUD_NAME ||
+              'dvecpg1tz',
+            uploadPreset:
+              doc.data.config?.cloudinary?.uploadPreset ||
+              process.env.CLOUDINARY_UPLOAD_PRESET ||
+              process.env.VITE_CLOUDINARY_UPLOAD_PRESET ||
+              'alshanas_unsigned',
+            folder:
+              doc.data.config?.cloudinary?.folder ||
+              process.env.CLOUDINARY_FOLDER ||
+              process.env.VITE_CLOUDINARY_FOLDER ||
+              'alshanas-glow',
+          },
+        },
       };
       const mongoBookings = await BookingModel.find({}).sort({ createdAt: -1 }).lean();
       if (mongoBookings && mongoBookings.length > 0) {
