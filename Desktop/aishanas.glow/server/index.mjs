@@ -10,8 +10,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
 const ENV_FILE = path.join(ROOT_DIR, '.env');
 
-const IS_VERCEL = Boolean(process.env.VERCEL);
-const DATA_DIR = IS_VERCEL ? path.join('/tmp', 'alshanas-data') : path.join(__dirname, 'data');
+const IS_VERCEL = Boolean(process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const DATA_DIR = IS_VERCEL || !fs.existsSync(path.join(__dirname, 'data'))
+  ? path.join('/tmp', 'alshanas-data')
+  : path.join(__dirname, 'data');
 const STUDIO_FILE = path.join(DATA_DIR, 'studio.json');
 const SECRETS_FILE = path.join(DATA_DIR, 'smtp.json');
 
@@ -58,7 +60,9 @@ try {
 function readJsonSafe(filePath, fallback) {
   try {
     if (!fs.existsSync(filePath)) return fallback;
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    if (!raw || !raw.trim()) return fallback;
+    return JSON.parse(raw);
   } catch {
     return fallback;
   }
@@ -66,24 +70,33 @@ function readJsonSafe(filePath, fallback) {
 
 function writeJsonSafe(filePath, value) {
   try {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch {}
+    }
     fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf-8');
   } catch (err) {
     console.warn(`[writeJsonSafe] Non-fatal write error (${filePath}):`, err?.message);
   }
 }
 
+let memoryStudio = null;
+
 function loadStudio() {
+  if (memoryStudio) return memoryStudio;
   let existing = readJsonSafe(STUDIO_FILE, null);
-  if (!existing && IS_VERCEL) {
+  if (!existing) {
     const localSeed = path.join(__dirname, 'data', 'studio.json');
     existing = readJsonSafe(localSeed, null);
   }
   if (!existing) {
-    const seeded = structuredClone(DEFAULT_SERVER_STUDIO);
-    writeJsonSafe(STUDIO_FILE, seeded);
-    return seeded;
+    memoryStudio = structuredClone(DEFAULT_SERVER_STUDIO);
+    writeJsonSafe(STUDIO_FILE, memoryStudio);
+    return memoryStudio;
   }
-  return {
+  memoryStudio = {
     ...DEFAULT_SERVER_STUDIO,
     ...existing,
     config: {
@@ -108,9 +121,18 @@ function loadStudio() {
     bookings: existing.bookings || [],
     emailLogs: existing.emailLogs || [],
   };
+  return memoryStudio;
 }
 
+function saveStudio(studio) {
+  memoryStudio = studio;
+  writeJsonSafe(STUDIO_FILE, studio);
+}
+
+let memorySecrets = null;
+
 function loadEmailSecrets() {
+  if (memorySecrets) return memorySecrets;
   const envResend = process.env.RESEND_API_KEY?.trim() || '';
   const envResendFrom = process.env.RESEND_FROM?.trim() || '';
   const envUser = process.env.GMAIL_USER?.trim() || '';
@@ -143,7 +165,7 @@ function loadEmailSecrets() {
     else provider = 'none';
   }
 
-  return {
+  memorySecrets = {
     provider,
     resendApiKey,
     resendFrom,
@@ -151,6 +173,7 @@ function loadEmailSecrets() {
     gmailAppPassword,
     tokenSecret: stored.tokenSecret,
   };
+  return memorySecrets;
 }
 
 function getEmailProviderStatus(secrets) {
@@ -648,190 +671,208 @@ function buildAdminStudio(studio) {
 const app = express();
 app.use(express.json({ limit: '2mb' }));
 
+// Diagnostic health ping
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    isVercel: IS_VERCEL,
+    siteUrl: SITE_URL,
+    tmpExists: fs.existsSync('/tmp'),
+  });
+});
+
 // Public studio read
-app.get('/api/studio', (_req, res) => {
-  const studio = loadStudio();
-  res.json(buildPublicStudio(studio));
+app.get('/api/studio', (_req, res, next) => {
+  try {
+    const studio = loadStudio();
+    res.json(buildPublicStudio(studio));
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Client submits booking -> Email #1 sent to Admin Gmail
-app.post('/api/bookings', async (req, res) => {
-  const studio = loadStudio();
-  const rules = studio.config.bookingRules;
-  const body = req.body || {};
-
-  const clientName = String(body.clientName || '').trim();
-  const clientPhone = String(body.clientPhone || '').trim();
-  const clientEmail = String(body.clientEmail || '').trim();
-  const clientInstagram = String(body.clientInstagram || '').trim();
-  const preferredDate = String(body.preferredDate || '').trim();
-  const preferredTime = String(body.preferredTime || '').trim();
-  const serviceId = String(body.serviceId || '').trim();
-  const variant = String(body.variant || 'full');
-  const addonIds = Array.isArray(body.addonIds) ? body.addonIds : [];
-  const notes = String(body.notes || '').trim();
-  const contraindicationsConfirmed = Boolean(body.contraindicationsConfirmed);
-
-  if (!clientName || !clientPhone || !clientEmail || !preferredDate || !preferredTime || !serviceId) {
-    return res.status(400).json({
-      error: 'Merci de renseigner votre nom, téléphone, e-mail, prestation, date et heure.',
-    });
-  }
-  if (!/^\d{2}:\d{2}$/.test(preferredTime)) {
-    return res.status(400).json({
-      error: 'Veuillez choisir une heure valide.',
-    });
-  }
-
-  const service = studio.services.find((s) => s.id === serviceId && s.active);
-  if (!service) {
-    return res.status(404).json({ error: 'Prestation introuvable ou inactive.' });
-  }
-
-  if (service.category === 'blanchiment' && !contraindicationsConfirmed) {
-    return res.status(400).json({
-      error: 'Veuillez confirmer les contre-indications du blanchiment dentaire.',
-    });
-  }
-
-  const [y, m, d] = preferredDate.split('-').map(Number);
-  const weekday = new Date(y, m - 1, d).getDay();
-  if (!rules.sundayEnabled && weekday === 0) {
-    return res.status(409).json({ error: 'Le studio est fermé le dimanche.' });
-  }
-  if ((rules.closedWeekdays || []).includes(weekday) || (rules.blockedDates || []).includes(preferredDate)) {
-    return res.status(409).json({ error: 'Cette journée est fermée à la réservation.' });
-  }
-  const slotBlocked = (rules.blockedSlots || []).some(
-    (s) => s.date === preferredDate && s.time === preferredTime
-  );
-  const slotConfirmed = (studio.bookings || []).some(
-    (b) => b.status === 'confirmed' && b.preferredDate === preferredDate && b.preferredTime === preferredTime
-  );
-  if (slotBlocked || slotConfirmed) {
-    return res.status(409).json({
-      error: 'Ce créneau vient d’être réservé ou bloqué. Veuillez choisir un autre horaire.',
-    });
-  }
-
-  let basePrice = service.fullPrice;
-  let variantLabel = service.fullLabel || 'Pose complète';
-  if ((variant === 'refill' || variant === 'tint') && service.refillPrice != null) {
-    basePrice = service.refillPrice;
-    variantLabel = service.refillLabel || (variant === 'tint' ? 'Avec teinture' : 'Remplissage 3 semaines');
-  }
-
-  const selectedAddons = studio.addons.filter((a) => a.active && addonIds.includes(a.id));
-  const addonsPrice = selectedAddons.reduce((sum, a) => sum + Number(a.price || 0), 0);
-  const sup = evaluateSupplement(preferredDate, preferredTime, rules);
-  const totalPrice = basePrice + addonsPrice + sup.amount;
-
-  const normalizedIg = clientInstagram
-    ? clientInstagram.startsWith('@')
-      ? clientInstagram
-      : `@${clientInstagram}`
-    : '';
-
-  const booking = {
-    id: `bk-${Date.now()}`,
-    reference: `AG-${Math.floor(1000 + Math.random() * 9000)}`,
-    createdAt: new Date().toISOString(),
-    status: 'pending',
-    clientName,
-    clientPhone,
-    clientEmail,
-    clientInstagram: normalizedIg,
-    serviceId: service.id,
-    serviceName: service.name,
-    category: service.category,
-    variant,
-    variantLabel,
-    addonIds: selectedAddons.map((a) => a.id),
-    addonNames: selectedAddons.map((a) => a.name),
-    preferredDate,
-    preferredTime,
-    isSupplementApplied: sup.applied,
-    supplementReason: sup.reason || undefined,
-    basePrice,
-    addonsPrice,
-    supplementPrice: sup.amount,
-    totalPrice,
-    contraindicationsConfirmed,
-    notes: notes || undefined,
-    source: 'web',
-  };
-
-  studio.bookings = [booking, ...(studio.bookings || [])];
-  writeJsonSafe(STUDIO_FILE, studio);
-
-  const adminRecipient = studio.config.contactEmail;
-  const originUrl = req.headers.origin || 'http://localhost:5173';
-  const subject = `[${studio.config.brandName}] Nouvelle demande à valider (${booking.reference}) — ${booking.clientName}`;
-  const text = [
-    `Nouvelle demande de rendez-vous sur ${studio.config.brandName}`,
-    `Référence : ${booking.reference}`,
-    `Cliente : ${booking.clientName}`,
-    `E-mail cliente : ${booking.clientEmail}`,
-    `Téléphone : ${booking.clientPhone}`,
-    booking.clientInstagram ? `Instagram : ${booking.clientInstagram}` : null,
-    `Prestation : ${booking.serviceName} (${booking.variantLabel})`,
-    booking.addonNames.length > 0 ? `Options : ${booking.addonNames.join(', ')}` : null,
-    `Date demandée : ${formatDateFr(booking.preferredDate)}`,
-    `Heure demandée : ${booking.preferredTime}`,
-    booking.isSupplementApplied ? `Supplément : +${booking.supplementPrice} € (${booking.supplementReason})` : null,
-    `Total estimé : ${booking.totalPrice} €`,
-    booking.notes ? `Précisions : ${booking.notes}` : null,
-    ``,
-    `Validez ou ajustez ce créneau dans l’administration : ${originUrl}/admin`,
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const html = createEmailHtml({
-    studio,
-    statusBadge: `Nouvelle demande · ${booking.reference}`,
-    title: `Validation requise — ${booking.clientName}`,
-    subtitle: `${booking.clientName} souhaite réserver un créneau. Validez, ajustez l’horaire ou refusez cette fiche dans votre espace administrateur.`,
-    rows: [
-      ['Référence', booking.reference],
-      ['Cliente', booking.clientName],
-      ['E-mail cliente', booking.clientEmail],
-      ['Téléphone', booking.clientPhone],
-      ['Instagram', booking.clientInstagram || 'Non renseigné'],
-      ['Prestation', `${booking.serviceName} (${booking.variantLabel})`],
-      ['Options', booking.addonNames.length > 0 ? booking.addonNames.join(', ') : 'Aucune'],
-      ['Date demandée', formatDateFr(booking.preferredDate)],
-      ['Heure souhaitée', booking.preferredTime],
-    ],
-    totalLabel: 'Total estimé de la prestation',
-    totalValue: `${booking.totalPrice} €`,
-    totalNote: booking.isSupplementApplied
-      ? `Inclut le supplément +${booking.supplementPrice} € (${booking.supplementReason})`
-      : 'Règle standard appliquée',
-    noteTitle: booking.notes ? 'Message de la cliente' : 'Action attendue',
-    noteBody:
-      booking.notes ||
-      'Connectez-vous à l’administration pour confirmer ce créneau et déclencher l’e-mail de validation vers la cliente.',
-    ctaLabel: 'Valider ou ajuster dans /admin',
-    ctaUrl: `${originUrl}/admin`,
-    footer: `Notification administrateur envoyée à ${adminRecipient} · ${studio.config.brandName}`,
-  });
-
-  let emailNotification = null;
+app.post('/api/bookings', async (req, res, next) => {
   try {
-    emailNotification = await dispatchEmail(studio, {
-      to: adminRecipient,
-      replyTo: booking.clientEmail,
-      subject,
-      text,
-      html,
-      kind: 'admin_alert',
-    });
-  } catch (err) {
-    console.error('Error dispatching admin alert email:', err);
-  }
+    const studio = loadStudio();
+    const rules = studio.config.bookingRules;
+    const body = req.body || {};
 
-  res.status(201).json({ booking, emailNotification });
+    const clientName = String(body.clientName || '').trim();
+    const clientPhone = String(body.clientPhone || '').trim();
+    const clientEmail = String(body.clientEmail || '').trim();
+    const clientInstagram = String(body.clientInstagram || '').trim();
+    const preferredDate = String(body.preferredDate || '').trim();
+    const preferredTime = String(body.preferredTime || '').trim();
+    const serviceId = String(body.serviceId || '').trim();
+    const variant = String(body.variant || 'full');
+    const addonIds = Array.isArray(body.addonIds) ? body.addonIds : [];
+    const notes = String(body.notes || '').trim();
+    const contraindicationsConfirmed = Boolean(body.contraindicationsConfirmed);
+
+    if (!clientName || !clientPhone || !clientEmail || !preferredDate || !preferredTime || !serviceId) {
+      return res.status(400).json({
+        error: 'Merci de renseigner votre nom, téléphone, e-mail, prestation, date et heure.',
+      });
+    }
+    if (!/^\d{2}:\d{2}$/.test(preferredTime)) {
+      return res.status(400).json({
+        error: 'Veuillez choisir une heure valide.',
+      });
+    }
+
+    const service = studio.services.find((s) => s.id === serviceId && s.active);
+    if (!service) {
+      return res.status(404).json({ error: 'Prestation introuvable ou inactive.' });
+    }
+
+    if (service.category === 'blanchiment' && !contraindicationsConfirmed) {
+      return res.status(400).json({
+        error: 'Veuillez confirmer les contre-indications du blanchiment dentaire.',
+      });
+    }
+
+    const [y, m, d] = preferredDate.split('-').map(Number);
+    const weekday = new Date(y, m - 1, d).getDay();
+    if (!rules.sundayEnabled && weekday === 0) {
+      return res.status(409).json({ error: 'Le studio est fermé le dimanche.' });
+    }
+    if ((rules.closedWeekdays || []).includes(weekday) || (rules.blockedDates || []).includes(preferredDate)) {
+      return res.status(409).json({ error: 'Cette journée est fermée à la réservation.' });
+    }
+    const slotBlocked = (rules.blockedSlots || []).some(
+      (s) => s.date === preferredDate && s.time === preferredTime
+    );
+    const slotConfirmed = (studio.bookings || []).some(
+      (b) => b.status === 'confirmed' && b.preferredDate === preferredDate && b.preferredTime === preferredTime
+    );
+    if (slotBlocked || slotConfirmed) {
+      return res.status(409).json({
+        error: 'Ce créneau vient d’être réservé ou bloqué. Veuillez choisir un autre horaire.',
+      });
+    }
+
+    let basePrice = service.fullPrice;
+    let variantLabel = service.fullLabel || 'Pose complète';
+    if ((variant === 'refill' || variant === 'tint') && service.refillPrice != null) {
+      basePrice = service.refillPrice;
+      variantLabel = service.refillLabel || (variant === 'tint' ? 'Avec teinture' : 'Remplissage 3 semaines');
+    }
+
+    const selectedAddons = studio.addons.filter((a) => a.active && addonIds.includes(a.id));
+    const addonsPrice = selectedAddons.reduce((sum, a) => sum + Number(a.price || 0), 0);
+    const sup = evaluateSupplement(preferredDate, preferredTime, rules);
+    const totalPrice = basePrice + addonsPrice + sup.amount;
+
+    const normalizedIg = clientInstagram
+      ? clientInstagram.startsWith('@')
+        ? clientInstagram
+        : `@${clientInstagram}`
+      : '';
+
+    const booking = {
+      id: `bk-${Date.now()}`,
+      reference: `AG-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      clientName,
+      clientPhone,
+      clientEmail,
+      clientInstagram: normalizedIg,
+      serviceId: service.id,
+      serviceName: service.name,
+      category: service.category,
+      variant,
+      variantLabel,
+      addonIds: selectedAddons.map((a) => a.id),
+      addonNames: selectedAddons.map((a) => a.name),
+      preferredDate,
+      preferredTime,
+      isSupplementApplied: sup.applied,
+      supplementReason: sup.reason || undefined,
+      basePrice,
+      addonsPrice,
+      supplementPrice: sup.amount,
+      totalPrice,
+      contraindicationsConfirmed,
+      notes: notes || undefined,
+      source: 'web',
+    };
+
+    studio.bookings = [booking, ...(studio.bookings || [])];
+    saveStudio(studio);
+
+    const adminRecipient = studio.config.contactEmail || 'alshanasglow@gmail.com';
+    const siteUrl = SITE_URL;
+    const subject = `[${studio.config.brandName}] Nouvelle demande à valider (${booking.reference}) — ${booking.clientName}`;
+    const text = [
+      `Nouvelle demande de rendez-vous sur ${studio.config.brandName}`,
+      `Référence : ${booking.reference}`,
+      `Cliente : ${booking.clientName}`,
+      `E-mail cliente : ${booking.clientEmail}`,
+      `Téléphone : ${booking.clientPhone}`,
+      booking.clientInstagram ? `Instagram : ${booking.clientInstagram}` : null,
+      `Prestation : ${booking.serviceName} (${booking.variantLabel})`,
+      booking.addonNames.length > 0 ? `Options : ${booking.addonNames.join(', ')}` : null,
+      `Date demandée : ${formatDateFr(booking.preferredDate)}`,
+      `Heure demandée : ${booking.preferredTime}`,
+      booking.isSupplementApplied ? `Supplément : +${booking.supplementPrice} € (${booking.supplementReason})` : null,
+      `Total estimé : ${booking.totalPrice} €`,
+      booking.notes ? `Précisions : ${booking.notes}` : null,
+      ``,
+      `Validez ou ajustez ce créneau dans l’administration : ${siteUrl}/admin`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const html = createEmailHtml({
+      studio,
+      statusBadge: `Nouvelle demande · ${booking.reference}`,
+      title: `Validation requise — ${booking.clientName}`,
+      subtitle: `${booking.clientName} souhaite réserver un créneau. Validez, ajustez l’horaire ou refusez cette fiche dans votre espace administrateur.`,
+      rows: [
+        ['Référence', booking.reference],
+        ['Cliente', booking.clientName],
+        ['E-mail cliente', booking.clientEmail],
+        ['Téléphone', booking.clientPhone],
+        ['Instagram', booking.clientInstagram || 'Non renseigné'],
+        ['Prestation', `${booking.serviceName} (${booking.variantLabel})`],
+        ['Options', booking.addonNames.length > 0 ? booking.addonNames.join(', ') : 'Aucune'],
+        ['Date demandée', formatDateFr(booking.preferredDate)],
+        ['Heure souhaitée', booking.preferredTime],
+      ],
+      totalLabel: 'Total estimé de la prestation',
+      totalValue: `${booking.totalPrice} €`,
+      totalNote: booking.isSupplementApplied
+        ? `Inclut le supplément +${booking.supplementPrice} € (${booking.supplementReason})`
+        : 'Règle standard appliquée',
+      noteTitle: booking.notes ? 'Message de la cliente' : 'Action attendue',
+      noteBody:
+        booking.notes ||
+        'Connectez-vous à l’administration pour confirmer ce créneau et déclencher l’e-mail de validation vers la cliente.',
+      ctaLabel: 'Valider ou ajuster dans /admin',
+      ctaUrl: `${siteUrl}/admin`,
+      footer: `Notification administrateur envoyée à ${adminRecipient} · ${studio.config.brandName}`,
+    });
+
+    let emailNotification = null;
+    try {
+      emailNotification = await dispatchEmail(studio, {
+        to: adminRecipient,
+        replyTo: booking.clientEmail,
+        subject,
+        text,
+        html,
+        kind: 'admin_alert',
+      });
+    } catch (err) {
+      console.error('Error dispatching admin alert email:', err);
+    }
+
+    res.status(201).json({ booking, emailNotification });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // Client confirms or declines a proposed option
@@ -1365,8 +1406,17 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/reset', requireAdmin, (_req, res) => {
   const seeded = structuredClone(DEFAULT_SERVER_STUDIO);
-  writeJsonSafe(STUDIO_FILE, seeded);
+  saveStudio(seeded);
   res.json({ studio: buildAdminStudio(seeded) });
+});
+
+// Express error handling middleware
+app.use((err, _req, res, _next) => {
+  console.error('[API Server Error]:', err);
+  res.status(500).json({
+    error: err?.message || 'Erreur interne du serveur',
+    stack: err?.stack,
+  });
 });
 
 const PORT = Number(process.env.PORT || 3001);
