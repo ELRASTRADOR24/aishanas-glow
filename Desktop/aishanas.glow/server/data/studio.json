@@ -385,10 +385,38 @@
   ],
   "bookings": [
     {
+      "id": "bk-1794622710961",
+      "reference": "AG-3787",
+      "createdAt": "2026-11-14T02:18:30.961Z",
+      "status": "confirmed",
+      "clientName": "Sophie Martin",
+      "clientPhone": "06 98 76 54 32",
+      "clientEmail": "johansonzoda@gmail.com",
+      "clientInstagram": "@sophie_martin",
+      "serviceId": "ext-pose-mixte",
+      "serviceName": "Pose mixte (cil à cil + 4D)",
+      "category": "extensions",
+      "variant": "full",
+      "variantLabel": "Pose complète",
+      "addonIds": [],
+      "addonNames": [],
+      "preferredDate": "2026-11-25",
+      "preferredTime": "14:00",
+      "isSupplementApplied": false,
+      "basePrice": 45,
+      "addonsPrice": 0,
+      "supplementPrice": 0,
+      "totalPrice": 45,
+      "contraindicationsConfirmed": true,
+      "notes": "Test de validation complète pour Alshana's Glow",
+      "source": "web",
+      "adminDecisionNote": "Votre créneau du 25 novembre est validé avec grand plaisir. À très vite au studio !"
+    },
+    {
       "id": "bk-1794620811038",
       "reference": "AG-5507",
       "createdAt": "2026-11-14T01:46:51.038Z",
-      "status": "pending",
+      "status": "confirmed",
       "clientName": "Test Client",
       "clientPhone": "0612345678",
       "clientEmail": "test@example.com",
@@ -409,7 +437,8 @@
       "totalPrice": 60,
       "contraindicationsConfirmed": true,
       "notes": "Test functional flow",
-      "source": "web"
+      "source": "web",
+      "adminDecisionNote": "Créneau validé avec plaisir ! À très vite au studio Alshana."
     },
     {
       "id": "bk-1794431850806",
@@ -441,6 +470,56 @@
     }
   ],
   "emailLogs": [
+    {
+      "id": "mail-1794622711791-933",
+      "createdAt": "2026-11-14T02:18:31.791Z",
+      "to": "johansonzoda@gmail.com",
+      "subject": "[Alshana's Glow] Test de réception E-mail (Administrateur)",
+      "kind": "test",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7d9-6874-7715-9c3c-9db72f9958a3) vers johansonzoda@gmail.com.",
+      "previewText": "Ce message confirme que l’envoi d’e-mails fonctionne pour le rôle Administrateur (johansonzoda@gmail.com)."
+    },
+    {
+      "id": "mail-1794622711536-406",
+      "createdAt": "2026-11-14T02:18:31.536Z",
+      "to": "johansonzoda@gmail.com",
+      "subject": "[Alshana's Glow] Rendez-vous confirmé — mercredi 25 novembre 2026 à 14:00",
+      "kind": "client_confirmed",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7d9-677f-71a1-b896-fda6fd40cf4a) vers johansonzoda@gmail.com.",
+      "previewText": "Bonjour Sophie Martin,\nVotre rendez-vous chez Alshana's Glow est validé.\nRéférence : AG-3787\nPrestation : Pose mixte (cil à cil + 4D) (Pose complète)\nDate confirmée : mercredi 25 novembre 2026\nHeure confirmée : 14:00\nTarif estimé : 45 €\nLieu : À deux pas de la Place Napoléon, La Roche-sur-Yon\nMot du studio : Votre créneau du 25 novembre est validé avec grand plaisir. À très vite au studio !\nPour toute question ou réajustement, contactez-nous sur Instagram : @alshanas.glow (https://www.instagram.com/alshanas.glow/)"
+    },
+    {
+      "id": "mail-1794622710963-679",
+      "createdAt": "2026-11-14T02:18:30.963Z",
+      "to": "johansonzoda@gmail.com",
+      "subject": "[Alshana's Glow] Nouvelle demande à valider (AG-3787) — Sophie Martin",
+      "kind": "admin_alert",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7d9-657e-70b1-b79d-fcd4a46b3a29) vers johansonzoda@gmail.com.",
+      "previewText": "Nouvelle demande de rendez-vous sur Alshana's Glow\nRéférence : AG-3787\nCliente : Sophie Martin\nE-mail cliente : johansonzoda@gmail.com\nTéléphone : 06 98 76 54 32\nInstagram : @sophie_martin\nPrestation : Pose mixte (cil à cil + 4D) (Pose complète)\nDate demandée : mercredi 25 novembre 2026\nHeure demandée : 14:00\nTotal estimé : 45 €\nPrécisions : Test de validation complète pour Alshana's Glow\nValidez ou ajustez ce créneau dans l’administration : http://localhost:5173/admin"
+    },
+    {
+      "id": "mail-1794622220847-816",
+      "createdAt": "2026-11-14T02:10:20.847Z",
+      "to": "test@example.com",
+      "subject": "[Alshana's Glow] Rendez-vous confirmé — vendredi 20 novembre 2026 à 14:00",
+      "kind": "client_confirmed",
+      "status": "error",
+      "detail": "Invalid `to` field. Please use our testing email address instead of domains like `example.com`. See our documentation for more information.",
+      "previewText": "Bonjour Test Client,\nVotre rendez-vous chez Alshana's Glow est validé.\nRéférence : AG-5507\nPrestation : Volume russe (Pose complète)\nDate confirmée : vendredi 20 novembre 2026\nHeure confirmée : 14:00\nTarif estimé : 60 €\nLieu : À deux pas de la Place Napoléon, La Roche-sur-Yon\nMot du studio : Créneau validé avec plaisir ! À très vite au studio Alshana.\nPour toute question ou réajustement, contactez-nous sur Instagram : @alshanas.glow (https://www.instagram.com/alshanas.glow/)"
+    },
+    {
+      "id": "mail-1794621959339-531",
+      "createdAt": "2026-11-14T02:05:59.339Z",
+      "to": "johansonzoda@gmail.com",
+      "subject": "[Alshana's Glow] Test de réception E-mail (Administrateur)",
+      "kind": "test",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7cd-ed7c-7998-891c-5f6e9c55d440) vers johansonzoda@gmail.com.",
+      "previewText": "Ce message confirme que l’envoi d’e-mails fonctionne pour le rôle Administrateur (johansonzoda@gmail.com)."
+    },
     {
       "id": "mail-1794620811065-14",
       "createdAt": "2026-11-14T01:46:51.065Z",

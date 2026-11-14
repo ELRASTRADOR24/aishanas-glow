@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Clock,
   Download,
   Eye,
@@ -224,6 +225,19 @@ export const AdminPage: React.FC = () => {
   >({});
   const [expandedBookingEditors, setExpandedBookingEditors] = useState<Record<string, boolean>>({});
   const [busyBookingId, setBusyBookingId] = useState<string | null>(null);
+
+  // Services accordion & filter
+  const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
+  const [expandedServiceIds, setExpandedServiceIds] = useState<Set<string>>(new Set());
+
+  const toggleServiceExpanded = (id: string) => {
+    setExpandedServiceIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Schedule rules inputs
   const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
@@ -1013,12 +1027,37 @@ export const AdminPage: React.FC = () => {
                           <h3 className="mt-1.5 font-serif text-2xl text-charcoal">
                             {booking.clientName}
                           </h3>
-                          <p className="text-xs text-taupe">
-                            Tél : {booking.clientPhone} · E-mail : {booking.clientEmail}
-                            {booking.clientInstagram
-                              ? ` · Instagram : ${booking.clientInstagram}`
-                              : ''}
-                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-2.5 text-xs text-taupe">
+                            <a
+                              href={`tel:${booking.clientPhone.replace(/\s+/g, '')}`}
+                              className="font-medium text-charcoal underline underline-offset-2 hover:opacity-75"
+                              title="Appeler la cliente"
+                            >
+                              Tél : {booking.clientPhone}
+                            </a>
+                            <span>·</span>
+                            <a
+                              href={`mailto:${booking.clientEmail}`}
+                              className="font-medium text-charcoal underline underline-offset-2 hover:opacity-75"
+                              title="Écrire un e-mail"
+                            >
+                              {booking.clientEmail}
+                            </a>
+                            {booking.clientInstagram && (
+                              <>
+                                <span>·</span>
+                                <a
+                                  href={`https://instagram.com/${booking.clientInstagram.replace('@', '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="font-medium text-charcoal underline underline-offset-2 hover:opacity-75"
+                                  title="Voir profil Instagram"
+                                >
+                                  {booking.clientInstagram}
+                                </a>
+                              </>
+                            )}
+                          </div>
                         </div>
 
                         <div className="text-right">
@@ -1993,224 +2032,326 @@ export const AdminPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {data.services.map((service) => {
-                const serviceImageEnabled = service.showImage !== false;
-                const globalImagesEnabled = data.config.showServiceImages !== false;
-                const isImageShownOnSite =
-                  globalImagesEnabled && serviceImageEnabled && Boolean(service.imageUrl);
-
+            {/* Filtres par catégorie pour trouver immédiatement un soin */}
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { id: 'all', label: 'Toutes les prestations' },
+                { id: 'extensions', label: 'Extensions' },
+                { id: 'depose', label: 'Déposes' },
+                { id: 'rehaussement', label: 'Rehaussement' },
+                { id: 'blanchiment', label: 'Blanchiment' },
+              ].map((cat) => {
+                const count =
+                  cat.id === 'all'
+                    ? data.services.length
+                    : data.services.filter((s) => s.category === cat.id).length;
+                const active = serviceCategoryFilter === cat.id;
                 return (
-                  <div
-                    key={service.id}
-                    className="border border-stone bg-white p-5 shadow-xs sm:p-6"
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setServiceCategoryFilter(cat.id)}
+                    className={`min-h-[38px] border px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
+                      active
+                        ? 'border-charcoal bg-charcoal text-ivory font-semibold'
+                        : 'border-stone bg-white text-charcoal hover:border-charcoal'
+                    }`}
                   >
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">Nom</label>
-                        <input
-                          type="text"
-                          value={service.name}
-                          onChange={(e) => upsertService({ ...service, name: e.target.value })}
-                          className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                        />
-                      </div>
+                    {cat.label} ({count})
+                  </button>
+                );
+              })}
+            </div>
 
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">Catégorie</label>
-                        <select
-                          value={service.category}
-                          onChange={(e) =>
-                            upsertService({
-                              ...service,
-                              category: e.target.value as ServiceCategory,
-                            })
-                          }
-                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
-                        >
-                          {CATEGORY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+            <div className="space-y-3">
+              {data.services
+                .filter((s) => serviceCategoryFilter === 'all' || s.category === serviceCategoryFilter)
+                .map((service) => {
+                  const serviceImageEnabled = service.showImage !== false;
+                  const globalImagesEnabled = data.config.showServiceImages !== false;
+                  const isImageShownOnSite =
+                    globalImagesEnabled && serviceImageEnabled && Boolean(service.imageUrl);
+                  const isExpanded = expandedServiceIds.has(service.id);
 
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">
-                          Tarif principal (€)
-                        </label>
-                        <input
-                          type="number"
-                          value={service.fullPrice}
-                          onChange={(e) =>
-                            upsertService({ ...service, fullPrice: Number(e.target.value) || 0 })
-                          }
-                          className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">
-                          Remplissage / Option (€)
-                        </label>
-                        <input
-                          type="number"
-                          value={service.refillPrice ?? ''}
-                          placeholder="Aucun"
-                          onChange={(e) =>
-                            upsertService({
-                              ...service,
-                              refillPrice: e.target.value === '' ? null : Number(e.target.value),
-                            })
-                          }
-                          className="mt-1 min-h-[44px] w-full border border-stone px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">Description</label>
-                        <textarea
-                          rows={2}
-                          value={service.description}
-                          onChange={(e) =>
-                            upsertService({ ...service, description: e.target.value })
-                          }
-                          className="mt-1 w-full border border-stone px-3 py-2 text-sm"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] text-taupe uppercase">
-                          Illustration ou photo du soin
-                        </label>
-                        <div className="mt-1 flex items-start gap-3">
-                          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden border border-stone bg-paper">
-                            {service.imageUrl ? (
-                              <img
-                                src={optimizeCloudinaryUrl(service.imageUrl, 160)}
-                                alt={service.name}
-                                className={`h-full w-full object-cover transition-opacity ${
-                                  isImageShownOnSite ? '' : 'opacity-35 grayscale'
-                                }`}
-                              />
-                            ) : (
-                              <span className="px-1 text-center text-[10px] leading-tight text-taupe uppercase">
-                                Sans visuel
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="min-w-0 flex-1 space-y-2">
-                            <input
-                              type="text"
-                              value={service.imageUrl || ''}
-                              placeholder="Ex. /srv-cil-a-cil.jpg ou lien de photo"
-                              onChange={(e) =>
-                                upsertService({ ...service, imageUrl: e.target.value })
-                              }
-                              className="min-h-[42px] w-full border border-stone px-3 py-2 text-xs"
+                  return (
+                    <div
+                      key={service.id}
+                      className="border border-stone bg-white shadow-xs transition-all"
+                    >
+                      {/* Entête pliée / dépliée de la prestation */}
+                      <div
+                        onClick={() => toggleServiceExpanded(service.id)}
+                        className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer hover:bg-ivory/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3.5">
+                          {service.imageUrl ? (
+                            <img
+                              src={optimizeCloudinaryUrl(service.imageUrl, 100)}
+                              alt=""
+                              className={`h-12 w-12 border border-charcoal/15 object-cover shrink-0 ${
+                                isImageShownOnSite ? '' : 'opacity-40 grayscale'
+                              }`}
                             />
-                            {data.media.length > 0 && (
+                          ) : (
+                            <div className="h-12 w-12 border border-stone/70 bg-ivory flex items-center justify-center text-[9px] text-taupe uppercase shrink-0">
+                              Sans image
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="font-serif text-lg font-medium text-charcoal">
+                                {service.name}
+                              </h4>
+                              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 border border-stone/60 bg-paper text-taupe">
+                                {service.category}
+                              </span>
+                              {service.active ? (
+                                <span className="text-[10px] text-emerald-800 font-medium bg-emerald-50 px-2 py-0.5 border border-emerald-200">
+                                  Actif sur le site
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-stone-600 bg-stone/20 px-2 py-0.5">
+                                  Masqué
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-xs text-taupe">
+                              Tarif : <strong className="text-charcoal">{service.fullPrice} €</strong>
+                              {service.refillPrice != null ? ` · Remplissage : ${service.refillPrice} €` : ''} · Durée : {service.durationMinutes} min
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleServiceExpanded(service.id);
+                            }}
+                            className="inline-flex min-h-[36px] items-center gap-1.5 border border-stone bg-white px-3 py-1 text-xs text-charcoal hover:border-charcoal transition-colors cursor-pointer"
+                          >
+                            <span>{isExpanded ? 'Fermer' : 'Modifier'}</span>
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Formulaire complet affiché au clic */}
+                      {isExpanded && (
+                        <div className="border-t border-stone/60 p-5 bg-paper/30 sm:p-6">
+                          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">Nom</label>
+                              <input
+                                type="text"
+                                value={service.name}
+                                onChange={(e) => upsertService({ ...service, name: e.target.value })}
+                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">Catégorie</label>
                               <select
-                                aria-label="Choisir une illustration ou photo enregistrée"
-                                value=""
-                                onChange={(e) => {
-                                  if (e.target.value) {
-                                    upsertService({
-                                      ...service,
-                                      imageUrl: e.target.value,
-                                      showImage: true,
-                                    });
-                                    notify('Illustration ou photo attribuée à la prestation.');
-                                  }
-                                }}
-                                className="min-h-[38px] w-full border border-stone/70 bg-ivory px-2.5 text-xs"
+                                value={service.category}
+                                onChange={(e) =>
+                                  upsertService({
+                                    ...service,
+                                    category: e.target.value as ServiceCategory,
+                                  })
+                                }
+                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
                               >
-                                <option value="">Choisir dans la bibliothèque d’images...</option>
-                                {data.media.map((m) => (
-                                  <option key={m.id} value={m.url}>
-                                    {m.label}
+                                {CATEGORY_OPTIONS.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
                                   </option>
                                 ))}
                               </select>
-                            )}
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">
+                                Tarif principal (€)
+                              </label>
+                              <input
+                                type="number"
+                                value={service.fullPrice}
+                                onChange={(e) =>
+                                  upsertService({ ...service, fullPrice: Number(e.target.value) || 0 })
+                                }
+                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">
+                                Remplissage / Option (€)
+                              </label>
+                              <input
+                                type="number"
+                                value={service.refillPrice ?? ''}
+                                placeholder="Aucun"
+                                onChange={(e) =>
+                                  upsertService({
+                                    ...service,
+                                    refillPrice: e.target.value === '' ? null : Number(e.target.value),
+                                  })
+                                }
+                                className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">Description</label>
+                              <textarea
+                                rows={2}
+                                value={service.description}
+                                onChange={(e) =>
+                                  upsertService({ ...service, description: e.target.value })
+                                }
+                                className="mt-1 w-full border border-stone bg-white px-3 py-2 text-sm"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] text-taupe uppercase">
+                                Illustration ou photo du soin
+                              </label>
+                              <div className="mt-1 flex items-start gap-3">
+                                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden border border-stone bg-paper">
+                                  {service.imageUrl ? (
+                                    <img
+                                      src={optimizeCloudinaryUrl(service.imageUrl, 160)}
+                                      alt={service.name}
+                                      className={`h-full w-full object-cover transition-opacity ${
+                                        isImageShownOnSite ? '' : 'opacity-35 grayscale'
+                                      }`}
+                                    />
+                                  ) : (
+                                    <span className="px-1 text-center text-[10px] leading-tight text-taupe uppercase">
+                                      Sans visuel
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1 space-y-2">
+                                  <input
+                                    type="text"
+                                    value={service.imageUrl || ''}
+                                    placeholder="Ex. /srv-cil-a-cil.jpg ou lien de photo"
+                                    onChange={(e) =>
+                                      upsertService({ ...service, imageUrl: e.target.value })
+                                    }
+                                    className="min-h-[42px] w-full border border-stone bg-white px-3 py-2 text-xs"
+                                  />
+                                  {data.media.length > 0 && (
+                                    <select
+                                      aria-label="Choisir une illustration ou photo enregistrée"
+                                      value=""
+                                      onChange={(e) => {
+                                        if (e.target.value) {
+                                          upsertService({
+                                            ...service,
+                                            imageUrl: e.target.value,
+                                            showImage: true,
+                                          });
+                                          notify('Illustration ou photo attribuée à la prestation.');
+                                        }
+                                      }}
+                                      className="min-h-[38px] w-full border border-stone/70 bg-ivory px-2.5 text-xs"
+                                    >
+                                      <option value="">Choisir dans la bibliothèque d’images...</option>
+                                      {data.media.map((m) => (
+                                        <option key={m.id} value={m.url}>
+                                          {m.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone/60 pt-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={service.active}
+                                  onChange={(e) =>
+                                    upsertService({ ...service, active: e.target.checked })
+                                  }
+                                  className="h-4 w-4 accent-charcoal"
+                                />
+                                <span>Prestation visible sur le site</span>
+                              </label>
+
+                              <label
+                                className={`inline-flex min-h-[40px] cursor-pointer items-center gap-2 border px-3 py-1.5 text-xs transition-colors ${
+                                  !service.imageUrl
+                                    ? 'border-stone/50 bg-ivory/60 text-taupe'
+                                    : serviceImageEnabled && globalImagesEnabled
+                                      ? 'border-stone bg-paper text-charcoal hover:border-charcoal'
+                                      : 'border-amber-300 bg-amber-50 text-amber-950'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={serviceImageEnabled}
+                                  onChange={(e) => {
+                                    const nextChecked = e.target.checked;
+                                    upsertService({ ...service, showImage: nextChecked });
+                                    notify(
+                                      nextChecked
+                                        ? `Illustration affichée pour « ${service.name} ».`
+                                        : `Illustration masquée pour « ${service.name} ».`
+                                    );
+                                  }}
+                                  className="h-4 w-4 accent-charcoal"
+                                />
+                                {serviceImageEnabled && globalImagesEnabled ? (
+                                  <Eye className="h-3.5 w-3.5 text-charcoal" aria-hidden="true" />
+                                ) : (
+                                  <EyeOff className="h-3.5 w-3.5 text-taupe" aria-hidden="true" />
+                                )}
+                                <span>
+                                  {!service.imageUrl
+                                    ? 'Pas d’image choisie'
+                                    : !serviceImageEnabled
+                                      ? 'Illustration masquée sur le site'
+                                      : !globalImagesEnabled
+                                        ? 'Afficher l’illustration (masquage global actif)'
+                                        : 'Afficher l’illustration'}
+                                </span>
+                              </label>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteService(service.id);
+                                notify('Prestation supprimée.');
+                              }}
+                              className="inline-flex min-h-[40px] items-center gap-1.5 border border-red-200 px-3 py-1.5 text-xs text-red-800 hover:bg-red-50 cursor-pointer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              <span>Supprimer</span>
+                            </button>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone/60 pt-3">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <label className="inline-flex min-h-[40px] cursor-pointer items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={service.active}
-                            onChange={(e) =>
-                              upsertService({ ...service, active: e.target.checked })
-                            }
-                            className="h-4 w-4 accent-charcoal"
-                          />
-                          <span>Prestation visible sur le site</span>
-                        </label>
-
-                        <label
-                          className={`inline-flex min-h-[40px] cursor-pointer items-center gap-2 border px-3 py-1.5 text-xs transition-colors ${
-                            !service.imageUrl
-                              ? 'border-stone/50 bg-ivory/60 text-taupe'
-                              : serviceImageEnabled && globalImagesEnabled
-                                ? 'border-stone bg-paper text-charcoal hover:border-charcoal'
-                                : 'border-amber-300 bg-amber-50 text-amber-950'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={serviceImageEnabled}
-                            onChange={(e) => {
-                              const nextChecked = e.target.checked;
-                              upsertService({ ...service, showImage: nextChecked });
-                              notify(
-                                nextChecked
-                                  ? `Illustration affichée pour « ${service.name} ».`
-                                  : `Illustration masquée pour « ${service.name} ».`
-                              );
-                            }}
-                            className="h-4 w-4 accent-charcoal"
-                          />
-                          {serviceImageEnabled && globalImagesEnabled ? (
-                            <Eye className="h-3.5 w-3.5 text-charcoal" aria-hidden="true" />
-                          ) : (
-                            <EyeOff className="h-3.5 w-3.5 text-taupe" aria-hidden="true" />
-                          )}
-                          <span>
-                            {!service.imageUrl
-                              ? 'Pas d’image choisie'
-                              : !serviceImageEnabled
-                                ? 'Illustration masquée sur le site'
-                                : !globalImagesEnabled
-                                  ? 'Afficher l’illustration (masquage global actif)'
-                                  : 'Afficher l’illustration'}
-                          </span>
-                        </label>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          deleteService(service.id);
-                          notify('Prestation supprimée.');
-                        }}
-                        className="inline-flex min-h-[40px] items-center gap-1.5 border border-red-200 px-3 py-1.5 text-xs text-red-800 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Supprimer</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
 
             <form onSubmit={handleAddService} className="border border-charcoal bg-white p-6">
