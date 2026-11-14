@@ -15,7 +15,7 @@ export const DEFAULT_STUDIO_DATA: StudioData = {
     instagramBannerTitle: 'Galerie, rétentions & contact direct sur Instagram',
     instagramBannerText:
       'Les réalisations complètes, retours clientes, tests de rétention et décorations de cils sont publiés en continu sur Instagram. En cas de doute sur une pose ou pour un réajustement particulier, échangez directement via @alshanas.glow.',
-    contactEmail: 'johansonzoda@gmail.com',
+    contactEmail: 'alshanasglow@gmail.com',
     adminPasscode: 'alshana2026',
     showServiceImages: true,
     cloudinary: {
