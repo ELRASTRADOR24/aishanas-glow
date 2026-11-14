@@ -48,7 +48,7 @@ const SECRETS_FILE = path.join(DATA_DIR, 'smtp.json');
 
 const DEFAULT_RESEND_KEY = process.env.RESEND_API_KEY || '';
 const DEFAULT_RESEND_FROM = process.env.RESEND_FROM || "Alshana's Glow <contact@xn--dynaceglobalsant-top-q2b.com>";
-export const SITE_URL = process.env.SITE_URL || 'https://alshanas-glow.vercel.app';
+export const SITE_URL = process.env.SITE_URL || 'https://aishanas-glow.vercel.app';
 
 const MONGODB_URI = process.env.MONGODB_URI?.trim() || '';
 
