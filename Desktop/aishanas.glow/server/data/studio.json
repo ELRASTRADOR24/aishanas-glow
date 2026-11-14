@@ -385,6 +385,33 @@
   ],
   "bookings": [
     {
+      "id": "bk-1794620811038",
+      "reference": "AG-5507",
+      "createdAt": "2026-11-14T01:46:51.038Z",
+      "status": "pending",
+      "clientName": "Test Client",
+      "clientPhone": "0612345678",
+      "clientEmail": "test@example.com",
+      "clientInstagram": "@test",
+      "serviceId": "ext-volume-russe",
+      "serviceName": "Volume russe",
+      "category": "extensions",
+      "variant": "full",
+      "variantLabel": "Pose complète",
+      "addonIds": [],
+      "addonNames": [],
+      "preferredDate": "2026-11-20",
+      "preferredTime": "14:00",
+      "isSupplementApplied": false,
+      "basePrice": 60,
+      "addonsPrice": 0,
+      "supplementPrice": 0,
+      "totalPrice": 60,
+      "contraindicationsConfirmed": true,
+      "notes": "Test functional flow",
+      "source": "web"
+    },
+    {
       "id": "bk-1794431850806",
       "reference": "AG-5826",
       "createdAt": "2026-11-11T21:17:30.806Z",
@@ -414,6 +441,16 @@
     }
   ],
   "emailLogs": [
+    {
+      "id": "mail-1794620811065-14",
+      "createdAt": "2026-11-14T01:46:51.065Z",
+      "to": "johansonzoda@gmail.com",
+      "subject": "[Alshana's Glow] Nouvelle demande à valider (AG-5507) — Test Client",
+      "kind": "admin_alert",
+      "status": "sent",
+      "detail": "E-mail envoyé via Resend (01a1d7bc-680a-7c89-9fec-38eb03fcc44a) vers johansonzoda@gmail.com.",
+      "previewText": "Nouvelle demande de rendez-vous sur Alshana's Glow\nRéférence : AG-5507\nCliente : Test Client\nE-mail cliente : test@example.com\nTéléphone : 0612345678\nInstagram : @test\nPrestation : Volume russe (Pose complète)\nDate demandée : vendredi 20 novembre 2026\nHeure demandée : 14:00\nTotal estimé : 60 €\nPrécisions : Test functional flow\nValidez ou ajustez ce créneau dans l’administration : http://localhost:5173/admin"
+    },
     {
       "id": "mail-1794434739805-969",
       "createdAt": "2026-11-11T22:05:39.805Z",

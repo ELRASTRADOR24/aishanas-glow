@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookingSection } from '../components/BookingSection';
+import { FaqSection } from '../components/FaqSection';
 import { Footer } from '../components/Footer';
 import { Hero } from '../components/Hero';
 import { InstagramSpotlight } from '../components/InstagramSpotlight';
@@ -26,6 +27,7 @@ export const HomePage: React.FC = () => {
         <Hero />
         <TariffCards onSelectServiceForBooking={handleSelectServiceForBooking} />
         <ProtocolsSection />
+        <FaqSection />
         <BookingSection
           preselectedServiceId={selectedServiceId}
           preselectedVariant={selectedVariant}

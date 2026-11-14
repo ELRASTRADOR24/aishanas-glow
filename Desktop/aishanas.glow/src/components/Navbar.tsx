@@ -8,8 +8,8 @@ export const Navbar: React.FC = () => {
   const { config } = data;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-stone/60 bg-paper/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-40 border-b border-stone/70 bg-paper/95 backdrop-blur-md">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2.5 font-serif text-xl font-semibold tracking-tight text-charcoal sm:text-2xl"
@@ -35,7 +35,13 @@ export const Navbar: React.FC = () => {
             to="/#protocoles"
             className="hidden text-xs font-medium tracking-widest text-taupe uppercase transition-colors hover:text-charcoal sm:inline-block"
           >
-            Soins & Protocoles
+            Protocoles
+          </Link>
+          <Link
+            to="/#faq"
+            className="hidden text-xs font-medium tracking-widest text-taupe uppercase transition-colors hover:text-charcoal sm:inline-block"
+          >
+            FAQ
           </Link>
           <Link
             to="/reserver"

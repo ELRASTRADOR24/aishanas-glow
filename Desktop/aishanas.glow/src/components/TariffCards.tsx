@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
 import type { BookingVariant, ServiceCategory, ServiceItem } from '../types/studio';
 import { optimizeCloudinaryUrl } from '../utils/cloudinary';
@@ -22,83 +22,14 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
   const activeServices = data.services.filter((s) => s.active);
   const showAllServiceImages = data.config.showServiceImages !== false;
 
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  const toggleDetails = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
   const shouldShowImage = (service: ServiceItem) =>
     showAllServiceImages && service.showImage !== false && Boolean(service.imageUrl);
 
-  const handleBookClick = (service: ServiceItem, variant: BookingVariant, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+  const handleBookClick = (service: ServiceItem, variant: BookingVariant = 'full') => {
     if (onSelectServiceForBooking) {
       onSelectServiceForBooking(service.id, variant);
     }
     navigate(`/reserver?service=${encodeURIComponent(service.id)}&variant=${encodeURIComponent(variant)}`);
-  };
-
-  const renderDescription = (service: ServiceItem) => {
-    if (!service.description) return null;
-    const isExpanded = expandedIds.has(service.id);
-    const maxLength = 58;
-
-    if (service.description.length <= maxLength) {
-      return (
-        <p className="mt-2 text-xs text-taupe leading-relaxed font-light">
-          {service.description}
-        </p>
-      );
-    }
-
-    const snippet = service.description.slice(0, maxLength).trim();
-
-    return (
-      <p className="mt-2 text-xs text-taupe leading-relaxed font-light">
-        {isExpanded ? (
-          <span>
-            {service.description}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDetails(service.id);
-              }}
-              className="ml-1 inline-block font-bold text-charcoal hover:opacity-60 cursor-pointer tracking-widest text-xs"
-              title="Réduire"
-            >
-              ...
-            </button>
-          </span>
-        ) : (
-          <span>
-            {snippet}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDetails(service.id);
-              }}
-              className="ml-0.5 inline-block font-bold text-charcoal hover:opacity-60 cursor-pointer tracking-widest text-xs"
-              title="Afficher la suite"
-            >
-              ...
-            </button>
-          </span>
-        )}
-      </p>
-    );
   };
 
   return (
@@ -108,61 +39,35 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
       className="surface-paper border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
     >
       <div className="mx-auto max-w-6xl">
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <img
-            src="/logo-eyes-dark.png"
-            alt=""
-            width={659}
-            height={226}
-            loading="lazy"
-            className="mx-auto mb-3 h-auto w-24 opacity-90 sm:w-28"
-          />
-          <p className="text-[11px] font-medium tracking-[0.24em] text-taupe uppercase">
-            Carte des prestations
+        {/* Header minimaliste */}
+        <div className="mb-12 text-center">
+          <p className="text-[10px] font-medium tracking-[0.28em] text-taupe uppercase">
+            Menu du Studio
           </p>
-          <h2 id="tarifs-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-5xl">
-            {data.config.brandName}
+          <h2 id="tarifs-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-5xl font-normal">
+            Prestations &amp; Tarifs
           </h2>
           <p className="mt-2 text-xs tracking-wide text-taupe sm:text-sm">
-            Cliquez sur une prestation pour réserver votre séance.
+            Cliquez sur une prestation pour choisir votre créneau.
           </p>
         </div>
 
-        {/* Note Dépose offerte pour dépose+repose - design carré luxueux */}
-        <div className="mb-8 border-l-2 border-charcoal bg-white/80 p-4 text-xs text-taupe sm:flex sm:items-center sm:justify-between sm:p-5">
-          <div className="flex items-center gap-2.5">
-            <span className="h-1.5 w-1.5 bg-charcoal shrink-0" />
-            <span>
-              <strong className="text-charcoal font-semibold">Dépose :</strong> Le retrait de vos cils est{' '}
-              <strong>gratuit uniquement si vous refaites une nouvelle pose de cils juste après</strong> (option offerte lors de votre réservation de pose). La dépose seule sans nouvelle pose reste payante (10€ studio / 15€ extérieur).
-            </span>
-          </div>
-          <span className="mt-2 inline-block font-serif text-sm font-bold text-charcoal sm:mt-0 whitespace-nowrap">
-            Offerte avec repose
-          </span>
-        </div>
-
-        {/* Grid of Service Cards — Entièrement carré, minimaliste et luxueux */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Grille de cartes épurées — Bords carrés, ultra-propres et luxueuses */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {activeServices.map((service) => {
-            const minPrice = service.fullPrice;
+            const defaultVariant: BookingVariant =
+              service.category === 'depose' || service.category === 'blanchiment'
+                ? 'standard'
+                : 'full';
 
             return (
               <div
                 key={service.id}
-                onClick={() =>
-                  handleBookClick(
-                    service,
-                    service.category === 'depose' || service.category === 'blanchiment'
-                      ? 'standard'
-                      : 'full'
-                  )
-                }
+                onClick={() => handleBookClick(service, defaultVariant)}
                 className="group flex flex-col justify-between border border-charcoal/15 bg-white transition-all duration-300 hover:border-charcoal hover:shadow-[0_16px_36px_-18px_rgba(20,19,17,0.18)] cursor-pointer"
               >
                 <div>
-                  {/* Image / Visuel sans zoom — Bords carrés, sans badge noir superposé */}
+                  {/* Visuel carré sans zoom */}
                   <div className="relative aspect-[16/10] w-full overflow-hidden bg-ivory border-b border-charcoal/10">
                     {shouldShowImage(service) && service.imageUrl ? (
                       <img
@@ -180,15 +85,15 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                       </div>
                     )}
 
-                    {/* Badge Catégorie sobre en haut à gauche */}
+                    {/* Badge Catégorie sobre */}
                     <div className="absolute top-3 left-3 z-10">
-                      <span className="border border-charcoal/20 bg-white/95 px-2.5 py-1 text-[10px] font-medium tracking-widest text-charcoal uppercase">
+                      <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
                         {CATEGORY_NAMES[service.category] || service.category}
                       </span>
                     </div>
                   </div>
 
-                  {/* Card Content avec Titre et Prix intégrés élégamment */}
+                  {/* Contenu sobre : Titre, sous-titre & prix */}
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
@@ -196,136 +101,47 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                           {service.name}
                         </h3>
                         {service.subtitle && (
-                          <p className="mt-0.5 text-xs font-medium text-taupe/80">
+                          <p className="mt-1 text-xs text-taupe">
                             {service.subtitle}
                           </p>
                         )}
                       </div>
-                      <div className="shrink-0 text-right">
+
+                      <div className="text-right shrink-0">
                         <span className="font-serif text-2xl font-normal text-charcoal">
-                          {minPrice}€
+                          {service.fullPrice}€
                         </span>
+                        {service.refillPrice != null && (
+                          <span className="block text-[10px] text-taupe uppercase tracking-wider">
+                            Rempl. {service.refillPrice}€
+                          </span>
+                        )}
                       </div>
                     </div>
-
-                    {/* Description avec points de suspension (...) cliquables */}
-                    {renderDescription(service)}
-
-                    {service.note && (
-                      <p className="mt-2 text-[11px] text-taupe/90 italic">
-                        {service.note}
-                      </p>
-                    )}
                   </div>
                 </div>
 
-                {/* Variant Options Selection — Boutons carrés et élégants vers /reserver */}
-                <div className="border-t border-charcoal/10 bg-ivory/30 p-4">
-                  {service.category === 'extensions' && (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-medium tracking-widest text-taupe uppercase">
-                        Choisir une formule :
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => handleBookClick(service, 'full', e)}
-                          className="flex min-h-[44px] flex-col items-center justify-center border border-charcoal/20 bg-white px-2 py-1.5 text-center transition-colors hover:border-charcoal hover:bg-paper cursor-pointer"
-                        >
-                          <span className="text-[10px] uppercase tracking-wider text-taupe">Pose complète</span>
-                          <span className="font-serif text-base font-bold text-charcoal">
-                            {service.fullPrice}€
-                          </span>
-                        </button>
-
-                        {service.refillPrice != null ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleBookClick(service, 'refill', e)}
-                            className="flex min-h-[44px] flex-col items-center justify-center border border-charcoal/20 bg-white px-2 py-1.5 text-center transition-colors hover:border-charcoal hover:bg-paper cursor-pointer"
-                          >
-                            <span className="text-[10px] uppercase tracking-wider text-taupe">Rempl. 3 sem.</span>
-                            <span className="font-serif text-base font-bold text-charcoal">
-                              {service.refillPrice}€
-                            </span>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-
-                  {service.category === 'rehaussement' && (
-                    <div className="space-y-2">
-                      <div className="text-[10px] font-medium tracking-widest text-taupe uppercase">
-                        Choisir une formule :
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => handleBookClick(service, 'full', e)}
-                          className="flex min-h-[44px] flex-col items-center justify-center border border-charcoal/20 bg-white px-2 py-1.5 text-center transition-colors hover:border-charcoal hover:bg-paper cursor-pointer"
-                        >
-                          <span className="text-[10px] uppercase tracking-wider text-taupe">Sans teinture</span>
-                          <span className="font-serif text-base font-bold text-charcoal">
-                            {service.fullPrice}€
-                          </span>
-                        </button>
-
-                        {service.refillPrice != null ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleBookClick(service, 'tint', e)}
-                            className="flex min-h-[44px] flex-col items-center justify-center border border-charcoal/20 bg-white px-2 py-1.5 text-center transition-colors hover:border-charcoal hover:bg-paper cursor-pointer"
-                          >
-                            <span className="text-[10px] uppercase tracking-wider text-taupe">Avec teinture</span>
-                            <span className="font-serif text-base font-bold text-charcoal">
-                              {service.refillPrice}€
-                            </span>
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-
-                  {service.category === 'depose' && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleBookClick(service, 'standard', e)}
-                      className="flex min-h-[44px] w-full items-center justify-between border border-charcoal bg-charcoal px-4 py-2.5 text-xs font-medium uppercase tracking-widest text-ivory transition-all hover:bg-silk cursor-pointer"
-                    >
-                      <span>Réserver cette dépose</span>
-                      <span className="flex items-center gap-1 font-serif text-sm font-bold text-ivory">
-                        {service.fullPrice}€
-                        <ChevronRight className="h-4 w-4" />
-                      </span>
-                    </button>
-                  )}
-
-                  {service.category === 'blanchiment' && (
-                    <button
-                      type="button"
-                      onClick={(e) => handleBookClick(service, 'standard', e)}
-                      className="flex min-h-[44px] w-full items-center justify-between border border-charcoal bg-charcoal px-4 py-2.5 text-xs font-medium uppercase tracking-widest text-ivory transition-all hover:bg-silk cursor-pointer"
-                    >
-                      <span>Réserver cette séance</span>
-                      <span className="flex items-center gap-1 font-serif text-sm font-bold text-ivory">
-                        {service.fullPrice}€
-                        <ChevronRight className="h-4 w-4" />
-                      </span>
-                    </button>
-                  )}
+                {/* Bouton d'action direct & minimaliste */}
+                <div className="border-t border-charcoal/10 px-5 py-3.5 bg-ivory/20 flex items-center justify-between transition-colors group-hover:bg-charcoal group-hover:text-ivory">
+                  <span className="text-[11px] font-medium tracking-widest uppercase">
+                    Réserver ce soin
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Note créneaux & suppléments en bas — Bords carrés luxueux */}
-        <div className="mt-12 border border-charcoal/15 bg-ivory/60 p-5 text-center text-xs leading-relaxed text-charcoal/85 sm:p-6">
-          <p className="font-medium tracking-widest uppercase">
-            Créneaux flexibles — Disponibilités &amp; Supplément
-          </p>
-          <p className="mt-1.5 text-taupe">{data.config.bookingRules.supplementNote}</p>
+        {/* Note sobre vers la FAQ */}
+        <div className="mt-10 text-center text-xs text-taupe">
+          <span>Déposes gratuites avec nouvelle pose, délais de remplissage et créneaux flexibles : </span>
+          <a
+            href="#faq"
+            className="font-medium text-charcoal underline underline-offset-4 hover:opacity-70 transition-opacity"
+          >
+            consulter les questions fréquentes (FAQ)
+          </a>
         </div>
       </div>
     </section>

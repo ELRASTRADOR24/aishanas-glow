@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowDownRight, Instagram, MapPin } from 'lucide-react';
+import { ArrowDownRight, MapPin } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
 
 export const Hero: React.FC = () => {
@@ -9,61 +9,49 @@ export const Hero: React.FC = () => {
   return (
     <section
       id="top"
-      className="surface-silk relative overflow-hidden border-b border-silk px-4 py-14 sm:px-6 sm:py-24"
+      className="surface-silk relative overflow-hidden border-b border-silk px-4 py-16 sm:px-6 sm:py-24"
     >
-      <div className="relative z-10 mx-auto max-w-4xl text-center">
+      <div className="relative z-10 mx-auto max-w-3xl text-center">
         <img
           src="/logo-eyes-light.png"
           alt={config.brandName}
           width={659}
           height={226}
           fetchPriority="high"
-          className="mx-auto mb-5 h-auto w-28 opacity-95 sm:w-36"
+          className="mx-auto mb-6 h-auto w-28 opacity-95 sm:w-36"
         />
 
-        <p className="mb-4 text-[11px] font-medium tracking-[0.26em] text-stone uppercase sm:text-xs">
-          {config.certificationLine} · {config.city}
+        <p className="mb-3 text-[11px] font-medium tracking-[0.28em] text-stone uppercase">
+          Studio Privé · {config.city}
         </p>
 
-        <h1 className="mx-auto max-w-3xl font-serif text-4xl leading-[1.08] font-normal text-ivory sm:text-6xl">
-          {config.heroTitle}
+        <h1 className="mx-auto max-w-2xl font-serif text-4xl leading-[1.1] font-normal text-ivory sm:text-6xl">
+          L’art du regard et de l’éclat sur mesure
         </h1>
 
-        <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-stone/90 sm:text-base">
-          {config.heroSubtitle}
+        <p className="mx-auto mt-4 max-w-lg text-sm leading-relaxed text-stone/90 sm:text-base font-light">
+          Extensions de cils haute précision, rehaussement et blanchiment dentaire.
         </p>
 
-        <div className="mt-4 inline-flex items-center justify-center gap-2 text-xs tracking-wide text-stone/80">
-          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>{config.locationLine}</span>
-        </div>
-
-        <div className="mt-9 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <a
-            href="#reservation"
-            className="inline-flex min-h-[50px] items-center justify-center gap-2 border border-ivory bg-ivory px-7 py-3 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone"
+            href="/reserver"
+            className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 border border-ivory bg-ivory px-8 py-3 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone sm:w-auto"
           >
-            <span>Prendre rendez-vous</span>
+            <span>Réserver un soin</span>
             <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
           </a>
           <a
             href="#tarifs"
-            className="inline-flex min-h-[50px] items-center justify-center border border-stone/50 px-7 py-3 text-xs font-medium tracking-[0.2em] text-ivory uppercase transition-colors hover:border-ivory"
+            className="inline-flex min-h-[48px] w-full items-center justify-center border border-stone/50 px-8 py-3 text-xs font-medium tracking-[0.2em] text-ivory uppercase transition-colors hover:border-ivory sm:w-auto"
           >
-            Carte des tarifs
+            Carte des prestations
           </a>
         </div>
 
-        <div className="mt-8 border-t border-white/10 pt-6">
-          <a
-            href={config.instagramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-[44px] items-center gap-2 text-xs tracking-[0.18em] text-stone uppercase transition-colors hover:text-ivory"
-          >
-            <Instagram className="h-4 w-4" aria-hidden="true" />
-            <span>Réalisations & Contact rapide : {config.handle}</span>
-          </a>
+        <div className="mt-8 inline-flex items-center justify-center gap-2 text-xs tracking-wider text-stone/70">
+          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>Place Napoléon, {config.city}</span>
         </div>
       </div>
     </section>
