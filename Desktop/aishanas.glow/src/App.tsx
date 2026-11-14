@@ -12,14 +12,23 @@ const ScrollManager: React.FC = () => {
   useEffect(() => {
     if (hash) {
       const id = hash.replace('#', '');
-      const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        const timer = setTimeout(() => {
-          const delayedEl = document.getElementById(id);
-          delayedEl?.scrollIntoView({ behavior: 'smooth' });
-        }, 120);
+      const scrollToTarget = () => {
+        const el = document.getElementById(id);
+        if (el) {
+          const headerOffset = 70;
+          const elementPosition = el.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth',
+          });
+          return true;
+        }
+        return false;
+      };
+
+      if (!scrollToTarget()) {
+        const timer = setTimeout(scrollToTarget, 120);
         return () => clearTimeout(timer);
       }
     } else {

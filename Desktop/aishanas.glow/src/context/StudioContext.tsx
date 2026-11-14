@@ -80,10 +80,19 @@ const StudioContext = createContext<StudioContextValue | null>(null);
 
 function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioData {
   if (!raw) return DEFAULT_STUDIO_DATA;
+  const rawLocation = raw.config?.locationLine || DEFAULT_STUDIO_DATA.config.locationLine;
+  const safeLocation =
+    !rawLocation ||
+    rawLocation.toLowerCase().includes('gallieni') ||
+    rawLocation.toLowerCase().includes('rue du')
+      ? 'À deux pas de la Place Napoléon, La Roche-sur-Yon'
+      : rawLocation;
+
   return {
     config: {
       ...DEFAULT_STUDIO_DATA.config,
       ...(raw.config ?? {}),
+      locationLine: safeLocation,
       showServiceImages: raw.config?.showServiceImages ?? true,
       cloudinary: {
         ...DEFAULT_STUDIO_DATA.config.cloudinary,
@@ -125,7 +134,13 @@ function getInitialStudioData(): StudioData {
     const raw = typeof window !== 'undefined' ? window.localStorage.getItem(LOCAL_STORAGE_BACKUP_KEY) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
-      return normalizeStudio(parsed);
+      const normalized = normalizeStudio(parsed);
+      if (raw.includes('Gallieni') || raw.includes('rue du Général')) {
+        try {
+          window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
+        } catch {}
+      }
+      return normalized;
     }
   } catch {}
   return DEFAULT_STUDIO_DATA;

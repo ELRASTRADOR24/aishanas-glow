@@ -12,7 +12,13 @@ export const Footer: React.FC = () => {
       const id = hash.replace('#', '');
       const el = document.getElementById(id);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
+        const headerOffset = 70;
+        const elementPosition = el.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth',
+        });
         window.history.pushState(null, '', `/#${id}`);
       }
     }
@@ -33,7 +39,12 @@ export const Footer: React.FC = () => {
           <p className="font-serif text-2xl text-ivory">{config.brandName}</p>
           <p className="mt-1 text-xs text-stone/80">{config.tagline}</p>
           <p className="mt-2 text-xs text-stone/70">
-            {config.locationLine} · {config.certificationLine}
+            {config.locationLine &&
+            !config.locationLine.toLowerCase().includes('gallieni') &&
+            !config.locationLine.toLowerCase().includes('rue')
+              ? config.locationLine
+              : 'À deux pas de la Place Napoléon, La Roche-sur-Yon'}{' '}
+            · {config.certificationLine}
           </p>
         </div>
 

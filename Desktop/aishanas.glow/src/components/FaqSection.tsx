@@ -59,7 +59,7 @@ export const FaqSection: React.FC = () => {
     <section
       id="faq"
       aria-labelledby="faq-heading"
-      className="surface-paper border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
+      className="surface-paper scroll-mt-20 border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
     >
       <div className="mx-auto max-w-3xl">
         <div className="text-center mb-10">

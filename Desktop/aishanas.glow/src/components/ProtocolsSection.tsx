@@ -14,7 +14,7 @@ export const ProtocolsSection: React.FC = () => {
     <section
       id="protocoles"
       aria-labelledby="protocoles-heading"
-      className="surface-silk border-b border-silk px-4 py-14 sm:px-6 sm:py-20"
+      className="surface-silk scroll-mt-20 border-b border-silk px-4 py-14 sm:px-6 sm:py-20"
     >
       <div className="relative z-10 mx-auto max-w-4xl">
         <div className="text-center">

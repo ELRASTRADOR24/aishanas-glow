@@ -36,7 +36,7 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
     <section
       id="tarifs"
       aria-labelledby="tarifs-heading"
-      className="surface-paper border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
+      className="surface-paper scroll-mt-20 border-b border-stone/70 px-4 py-14 sm:px-6 sm:py-20"
     >
       <div className="mx-auto max-w-6xl">
         {/* Header minimaliste */}

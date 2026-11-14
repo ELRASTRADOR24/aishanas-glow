@@ -43,6 +43,15 @@ export const Hero: React.FC = () => {
           </a>
           <a
             href="#tarifs"
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById('tarifs');
+              if (el) {
+                const top = el.getBoundingClientRect().top + window.pageYOffset - 70;
+                window.scrollTo({ top, behavior: 'smooth' });
+                window.history.pushState(null, '', '/#tarifs');
+              }
+            }}
             className="inline-flex min-h-[48px] w-full items-center justify-center border border-stone/50 px-8 py-3 text-xs font-medium tracking-[0.2em] text-ivory uppercase transition-colors hover:border-ivory sm:w-auto"
           >
             Carte des prestations
@@ -51,7 +60,13 @@ export const Hero: React.FC = () => {
 
         <div className="mt-8 inline-flex items-center justify-center gap-2 text-xs tracking-wider text-stone/70">
           <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          <span>{config.locationLine}</span>
+          <span>
+            {config.locationLine &&
+            !config.locationLine.toLowerCase().includes('gallieni') &&
+            !config.locationLine.toLowerCase().includes('rue')
+              ? config.locationLine
+              : 'À deux pas de la Place Napoléon, La Roche-sur-Yon'}
+          </span>
         </div>
       </div>
     </section>
