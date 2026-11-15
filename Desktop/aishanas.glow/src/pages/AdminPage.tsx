@@ -315,6 +315,21 @@ export const AdminPage: React.FC = () => {
 
   // Bookings filter & decision edits (par défaut sur les demandes en attente)
   const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'all'>('pending');
+
+  const filteredBookings: BookingRequest[] = useMemo(() => {
+    const list =
+      bookingFilter === 'all'
+        ? [...(data.bookings || [])]
+        : (data.bookings || []).filter((b) => b.status === bookingFilter);
+
+    // Tri chronologique : plus récentes demandes reçues en premier
+    return list.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [data.bookings, bookingFilter]);
+
   const [bookingEdits, setBookingEdits] = useState<
     Record<string, { preferredDate?: string; preferredTime?: string; adminDecisionNote?: string }>
   >({});
@@ -511,20 +526,6 @@ export const AdminPage: React.FC = () => {
       </div>
     );
   }
-
-  const filteredBookings: BookingRequest[] = useMemo(() => {
-    const list =
-      bookingFilter === 'all'
-        ? [...data.bookings]
-        : data.bookings.filter((b) => b.status === bookingFilter);
-
-    // Tri chronologique : plus récentes demandes reçues en premier
-    return list.sort((a, b) => {
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return timeB - timeA;
-    });
-  }, [data.bookings, bookingFilter]);
 
   const handleBookingDecision = async (booking: BookingRequest, nextStatus: BookingStatus) => {
     const edits = bookingEdits[booking.id] || {};
