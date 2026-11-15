@@ -16,6 +16,31 @@ import type { ServerEmailNotification } from '../utils/emailDispatch';
 
 const TOKEN_STORAGE_KEY = 'alshana_admin_token_v2';
 
+const getStoredToken = (): string | null => {
+  try {
+    return (
+      window.localStorage.getItem(TOKEN_STORAGE_KEY) ||
+      window.sessionStorage.getItem(TOKEN_STORAGE_KEY)
+    );
+  } catch {
+    return null;
+  }
+};
+
+const storeToken = (token: string) => {
+  try {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  } catch {}
+};
+
+const removeStoredToken = () => {
+  try {
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  } catch {}
+};
+
 export interface SubmitBookingPayload {
   clientName: string;
   clientPhone: string;
@@ -179,7 +204,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [loading, setLoading] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(() => {
-    return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    return getStoredToken();
   });
   const saveSeqRef = useRef(0);
 
@@ -211,7 +236,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.status === 401 && !token.startsWith('alshana-client-token-')) {
-          window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+          removeStoredToken();
           setAdminToken(null);
           return;
         }
@@ -294,7 +319,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (res.ok && payload?.token) {
-        window.sessionStorage.setItem(TOKEN_STORAGE_KEY, payload.token);
+        storeToken(payload.token);
         setAdminToken(payload.token);
         if (payload.studio) {
           const normalized = normalizeStudio(payload.studio);
@@ -335,12 +360,12 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     const fallbackToken = `alshana-client-token-${Date.now()}`;
-    window.sessionStorage.setItem(TOKEN_STORAGE_KEY, fallbackToken);
+    storeToken(fallbackToken);
     setAdminToken(fallbackToken);
   };
 
   const logoutAdmin = () => {
-    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    removeStoredToken();
     setAdminToken(null);
     refreshPublicStudio();
   };

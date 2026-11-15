@@ -247,9 +247,17 @@ export const AdminPage: React.FC = () => {
     resetStudioData,
   } = useStudio();
 
-  const [loginEmailInput, setLoginEmailInput] = useState(
-    data.config.contactEmail || 'alshanasglow@gmail.com'
-  );
+  const [loginEmailInput, setLoginEmailInput] = useState(() => {
+    try {
+      return (
+        window.localStorage.getItem('alshana_admin_email') ||
+        data.config.contactEmail ||
+        'alshanasglow@gmail.com'
+      );
+    } catch {
+      return 'alshanasglow@gmail.com';
+    }
+  });
   const [passcodeInput, setPasscodeInput] = useState('');
   const [showPasscode, setShowPasscode] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -368,6 +376,9 @@ export const AdminPage: React.FC = () => {
     setLoggingIn(true);
     try {
       await loginAdmin(passcodeInput, loginEmailInput);
+      try {
+        window.localStorage.setItem('alshana_admin_email', loginEmailInput.trim());
+      } catch {}
       setPasscodeInput('');
     } catch (err) {
       setAuthError(err instanceof Error ? err.message : 'Identifiants incorrects.');
