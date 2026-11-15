@@ -227,6 +227,7 @@ const CATEGORY_OPTIONS: { value: ServiceCategory; label: string }[] = [
 export const AdminPage: React.FC = () => {
   const {
     data,
+    loading,
     adminToken,
     loginAdmin,
     logoutAdmin,
@@ -387,6 +388,18 @@ export const AdminPage: React.FC = () => {
     }
   };
 
+  if (adminToken && loading) {
+    return (
+      <div className="surface-silk flex min-h-dvh items-center justify-center px-4 py-12">
+        <div className="relative z-10 flex flex-col items-center gap-4 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-sand" />
+          <h2 className="font-serif text-2xl tracking-wide text-ivory">Espace Administration</h2>
+          <p className="text-xs text-stone/75">Synchronisation sécurisée de vos données en cours...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!adminToken) {
     return (
       <div className="surface-silk flex min-h-dvh items-center justify-center px-4 py-12">
@@ -421,7 +434,6 @@ export const AdminPage: React.FC = () => {
                 name="email"
                 type="email"
                 autoComplete="email"
-                required
                 value={loginEmailInput}
                 onChange={(e) => {
                   setLoginEmailInput(e.target.value);
@@ -460,7 +472,7 @@ export const AdminPage: React.FC = () => {
                   aria-pressed={showPasscode}
                   aria-label={showPasscode ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                   onClick={() => setShowPasscode((prev) => !prev)}
-                  className="absolute right-1 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-stone hover:text-ivory"
+                  className="absolute right-1 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-stone hover:text-ivory cursor-pointer"
                 >
                   {showPasscode ? (
                     <EyeOff className="h-4 w-4" aria-hidden="true" />
@@ -480,15 +492,20 @@ export const AdminPage: React.FC = () => {
             <button
               type="submit"
               disabled={loggingIn}
-              className="flex min-h-[48px] w-full items-center justify-center border border-ivory bg-ivory px-4 py-2.5 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone disabled:opacity-60"
+              className="flex min-h-[48px] w-full items-center justify-center border border-ivory bg-ivory px-4 py-2.5 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone disabled:opacity-60 cursor-pointer"
             >
               {loggingIn ? 'Connexion...' : 'Accéder au tableau de bord'}
             </button>
 
-            <p className="border-t border-white/10 pt-3 text-[11px] text-stone/65">
-              Code initial de démonstration : <code>alshana2026</code> (modifiable dans Cloudinary &
-              Paramètres).
-            </p>
+            <div className="border-t border-white/10 pt-3 space-y-1.5 text-[11px] text-stone/75">
+              <div className="flex items-center gap-1.5 text-sand">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Session persistante active : vous restez connecté(e) sur cet appareil.</span>
+              </div>
+              <p>
+                Code initial : <code>alshana2026</code> (modifiable dans vos paramètres).
+              </p>
+            </div>
           </form>
         </div>
       </div>

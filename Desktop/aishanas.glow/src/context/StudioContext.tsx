@@ -173,23 +173,24 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
 
 const LOCAL_STORAGE_BACKUP_KEY = 'alshanas_studio_custom_data';
 
+function cachePublicDataSafely(studio: StudioData) {
+  try {
+    const safeCopy = { ...studio, bookings: [] };
+    window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(safeCopy));
+  } catch {}
+}
+
 function getInitialStudioData(): StudioData {
   try {
     const raw = typeof window !== 'undefined' ? window.localStorage.getItem(LOCAL_STORAGE_BACKUP_KEY) : null;
     if (raw) {
       const parsed = JSON.parse(raw);
       const normalized = normalizeStudio(parsed);
-      if (
-        raw.includes('Gallieni') ||
-        raw.includes('rue du Général') ||
-        raw.includes('Blanchiment dentaire') ||
-        raw.includes('Ultra-White')
-      ) {
-        try {
-          window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
-        } catch {}
-      }
-      return normalized;
+      // Toujours démarrer avec bookings vide en local pour que les données du serveur MongoDB Atlas fassent autorité
+      return {
+        ...normalized,
+        bookings: [],
+      };
     }
   } catch {}
   return DEFAULT_STUDIO_DATA;
@@ -216,9 +217,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const normalized = normalizeStudio(json);
         dataRef.current = normalized;
         setData(normalized);
-        try {
-          window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
-        } catch {}
+        cachePublicDataSafely(normalized);
       }
     } catch {
       // Offline fallback: keep existing data from localStorage
@@ -245,9 +244,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           const normalized = normalizeStudio(json);
           dataRef.current = normalized;
           setData(normalized);
-          try {
-            window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
-          } catch {}
+          cachePublicDataSafely(normalized);
         }
       } catch {
         // Fallback: keep existing data
@@ -267,9 +264,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const persistAdminUpdate = async (nextData: StudioData) => {
     const seq = ++saveSeqRef.current;
     setData(nextData);
-    try {
-      window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(nextData));
-    } catch {}
+    cachePublicDataSafely(nextData);
     if (!adminToken) return;
     try {
       const res = await fetch('/api/admin/studio', {
@@ -285,7 +280,6 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           protocols: nextData.protocols,
           media: nextData.media,
           faqs: nextData.faqs,
-          bookings: nextData.bookings,
         }),
       });
       if (res.ok && seq === saveSeqRef.current) {
@@ -301,7 +295,6 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const cleanedPasscode = passcode.trim();
     const cleanedEmail = (email || '').trim().toLowerCase();
     const expectedPasscode = (data.config.adminPasscode || 'alshana2026').trim();
-    const expectedEmail = (data.config.contactEmail || 'alshanasglow@gmail.com').trim().toLowerCase();
 
     // 1. Try backend API first
     try {
@@ -324,9 +317,7 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (payload.studio) {
           const normalized = normalizeStudio(payload.studio);
           setData(normalized);
-          try {
-            window.localStorage.setItem(LOCAL_STORAGE_BACKUP_KEY, JSON.stringify(normalized));
-          } catch {}
+          cachePublicDataSafely(normalized);
         }
         return;
       }
@@ -346,17 +337,8 @@ export const StudioProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // 2. Client-side fallback for static hostings (like Vercel static rewrite returning 405)
     const isValidPass = cleanedPasscode === expectedPasscode || cleanedPasscode === 'alshana2026';
-    const isValidEmail =
-      !cleanedEmail ||
-      cleanedEmail === expectedEmail ||
-      cleanedEmail === 'alshanasglow@gmail.com' ||
-      cleanedEmail === 'johansonzoda@gmail.com';
-
     if (!isValidPass) {
       throw new Error('Mot de passe incorrect.');
-    }
-    if (!isValidEmail) {
-      throw new Error('Adresse e-mail administrateur non reconnue.');
     }
 
     const fallbackToken = `alshana-client-token-${Date.now()}`;

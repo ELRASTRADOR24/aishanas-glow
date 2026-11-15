@@ -83,11 +83,10 @@
       "refillLabel": "Remplissage 3 semaines",
       "durationMinutes": 120,
       "description": "Association harmonieuse de cil à cil et de bouquets 4D pour un regard texturé et étoffé.",
-      "note": "Pas de remplissages successifs possibles",
-      "imageUrl": "https://res.cloudinary.com/dvecpg1tz/image/upload/f_auto,q_auto/v1794696368/alshanas-glow/wyuwptjnf49zv20wjmrb.webp",
+      "imageUrl": "https://res.cloudinary.com/dvecpg1tz/video/upload/c_limit,w_1080/q_auto:good,vc_auto/v1794702134/alshanas-glow/yifmdcidjplomztltjf7.mp4",
       "showImage": true,
-      "supportsLashOptions": true,
-      "active": true
+      "active": true,
+      "supportsLashOptions": true
     },
     {
       "id": "ext-volume-leger",
