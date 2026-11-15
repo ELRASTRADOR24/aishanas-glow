@@ -8,7 +8,20 @@ import {
   formatFrenchDate,
   getDayAvailability,
 } from '../utils/bookingLogic';
-import { optimizeCloudinaryUrl } from '../utils/cloudinary';
+import { isVideoUrl, optimizeCloudinaryUrl } from '../utils/cloudinary';
+
+const SERVICE_DEFAULT_ILLUSTRATIONS: Record<string, string> = {
+  'ext-cil-a-cil': '/srv-cil-a-cil.jpg',
+  'ext-pose-mixte': '/srv-pose-mixte.jpg',
+  'ext-volume-leger': '/srv-volume-leger.jpg',
+  'ext-volume-russe': '/srv-volume-russe.jpg',
+  'ext-whispy-manga': '/srv-whispy-manga.jpg',
+  'dep-alshana': '/srv-depose-studio.jpg',
+  'dep-exterieur': '/srv-depose-exterieur.jpg',
+  'reh-cils': '/srv-rehaussement.jpg',
+  'bla-ultra-white-1': '/srv-blanchiment-1.jpg',
+  'bla-ultra-white-2': '/srv-blanchiment-2.jpg',
+};
 
 interface BookingSectionProps {
   preselectedServiceId: string | null;
@@ -440,13 +453,26 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
               {currentService && (
                 <div className="border border-charcoal/15 bg-ivory/40 p-4 sm:p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                    {currentService.imageUrl && (
-                      <img
-                        src={optimizeCloudinaryUrl(currentService.imageUrl, 240)}
-                        alt={currentService.name}
-                        className="h-20 w-20 border border-charcoal/15 object-cover shrink-0"
-                      />
-                    )}
+                    {(() => {
+                      const fallback = SERVICE_DEFAULT_ILLUSTRATIONS[currentService.id] || '/srv-pose-mixte.jpg';
+                      const isVid = isVideoUrl(currentService.imageUrl);
+                      const imgSrc = (!currentService.imageUrl || isVid)
+                        ? fallback
+                        : optimizeCloudinaryUrl(currentService.imageUrl, 240);
+
+                      return (
+                        <img
+                          src={imgSrc}
+                          alt={currentService.name}
+                          onError={(e) => {
+                            if (e.currentTarget.src !== fallback) {
+                              e.currentTarget.src = fallback;
+                            }
+                          }}
+                          className="h-20 w-20 border border-charcoal/15 object-cover shrink-0 bg-ivory"
+                        />
+                      );
+                    })()}
                     <div className="flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <h4 className="font-serif text-xl text-charcoal sm:text-2xl">

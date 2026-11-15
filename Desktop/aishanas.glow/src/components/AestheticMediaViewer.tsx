@@ -12,6 +12,7 @@ interface AestheticMediaViewerProps {
   showControls?: boolean;
   badge?: string;
   objectPosition?: string;
+  onBook?: () => void;
 }
 
 export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
@@ -24,6 +25,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   showControls = true,
   badge,
   objectPosition = 'center 35%',
+  onBook,
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlayMuted);
   const [isMuted, setIsMuted] = useState(true);
@@ -31,6 +33,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [mediaError, setMediaError] = useState(false);
+  const [isVerticalVideo, setIsVerticalVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const modalVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -40,7 +43,15 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   useEffect(() => {
     setMediaError(false);
     setProgress(0);
+    setIsVerticalVideo(false);
   }, [url]);
+
+  const handleVideoMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (v.videoHeight > v.videoWidth) {
+      setIsVerticalVideo(true);
+    }
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -108,7 +119,22 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
         className={`group relative ${aspectRatioClass} w-full overflow-hidden bg-obsidian border-b border-charcoal/10 select-none ${className}`}
       >
         {isVideo ? (
-          <div className="relative h-full w-full">
+          <div className="relative h-full w-full overflow-hidden">
+            {/* Arrière-plan flou d'ambiance pour les vidéos verticales afin d'éliminer les bandes noires */}
+            {isVerticalVideo && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
+                <video
+                  src={url}
+                  autoPlay={autoPlayMuted}
+                  loop
+                  muted
+                  playsInline
+                  aria-hidden="true"
+                  className="h-full w-full object-cover scale-125 filter blur-xl opacity-40 brightness-75 select-none"
+                />
+              </div>
+            )}
+
             <video
               ref={videoRef}
               src={url}
@@ -117,9 +143,10 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
               muted={isMuted}
               playsInline
               preload="metadata"
+              onLoadedMetadata={handleVideoMetadata}
               onError={() => setMediaError(true)}
               style={{ objectPosition }}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              className={`relative z-10 h-full w-full ${isVerticalVideo ? 'object-contain mx-auto' : 'object-cover'} transition-transform duration-500 group-hover:scale-105`}
             />
 
             {/* Custom Aesthetic Controls Overlay */}
@@ -263,6 +290,19 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
             <p className="mt-2 text-center text-xs tracking-wider text-stone/80 uppercase">
               {alt} · Alshana's Glow
             </p>
+
+            {onBook && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  onBook();
+                }}
+                className="mt-3 inline-flex items-center gap-2 border border-ivory/30 bg-charcoal/90 px-6 py-2.5 text-xs font-semibold tracking-widest text-ivory uppercase hover:bg-ivory hover:text-charcoal transition-colors cursor-pointer"
+              >
+                <span>Réserver ce soin</span>
+              </button>
+            )}
           </div>
         </div>
       )}

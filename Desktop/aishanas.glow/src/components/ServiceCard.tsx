@@ -1,6 +1,19 @@
 import React from 'react';
 import type { ServiceItem, BookingVariant } from '../types/studio';
-import { optimizeCloudinaryUrl } from '../utils/cloudinary';
+import { isVideoUrl, optimizeCloudinaryUrl } from '../utils/cloudinary';
+
+const SERVICE_DEFAULT_ILLUSTRATIONS: Record<string, string> = {
+  'ext-cil-a-cil': '/srv-cil-a-cil.jpg',
+  'ext-pose-mixte': '/srv-pose-mixte.jpg',
+  'ext-volume-leger': '/srv-volume-leger.jpg',
+  'ext-volume-russe': '/srv-volume-russe.jpg',
+  'ext-whispy-manga': '/srv-whispy-manga.jpg',
+  'dep-alshana': '/srv-depose-studio.jpg',
+  'dep-exterieur': '/srv-depose-exterieur.jpg',
+  'reh-cils': '/srv-rehaussement.jpg',
+  'bla-ultra-white-1': '/srv-blanchiment-1.jpg',
+  'bla-ultra-white-2': '/srv-blanchiment-2.jpg',
+};
 
 interface ServiceCardProps {
   service: ServiceItem;
@@ -12,15 +25,26 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, shouldShowIma
   const [showDesc, setShowDesc] = React.useState(false);
   const shortSummary = service.description ? service.description.split(' ').slice(0,6).join(' ') + (service.description.split(' ').length > 6 ? '…' : '') : '';
 
+  const fallback = SERVICE_DEFAULT_ILLUSTRATIONS[service.id] || '/srv-pose-mixte.jpg';
+  const isVid = isVideoUrl(service.imageUrl);
+  const imgSrc = (!service.imageUrl || isVid)
+    ? fallback
+    : optimizeCloudinaryUrl(service.imageUrl, 180);
+
   return (
     <div className="border border-charcoal/15 bg-white p-4 shadow-sm rounded-lg flex flex-col items-start cursor-pointer" onClick={() => handleBookClick(service, 'full')}>
-      {shouldShowImage && service.imageUrl && (
+      {shouldShowImage && (
         <img
-          src={optimizeCloudinaryUrl(service.imageUrl, 180)}
+          src={imgSrc}
           alt={service.name}
           width={80}
           height={80}
-          className="mb-3 h-20 w-20 rounded object-cover"
+          onError={(e) => {
+            if (e.currentTarget.src !== fallback) {
+              e.currentTarget.src = fallback;
+            }
+          }}
+          className="mb-3 h-20 w-20 rounded object-cover bg-ivory"
         />
       )}
       <p className="font-serif text-xl text-charcoal">{service.name}</p>

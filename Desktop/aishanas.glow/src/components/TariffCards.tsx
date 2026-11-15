@@ -63,37 +63,40 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
             return (
               <div
                 key={service.id}
-                onClick={() => handleBookClick(service, defaultVariant)}
-                className="group flex flex-col justify-between border border-charcoal/15 bg-white transition-all duration-300 hover:border-charcoal hover:shadow-[0_16px_36px_-18px_rgba(20,19,17,0.18)] cursor-pointer"
+                className="group flex flex-col justify-between border border-charcoal/15 bg-white transition-all duration-300 hover:border-charcoal hover:shadow-[0_16px_36px_-18px_rgba(20,19,17,0.18)]"
               >
                 <div>
-                  {shouldShowImage(service) && service.imageUrl ? (
-                    <AestheticMediaViewer
-                      url={service.imageUrl}
-                      alt={service.name}
-                      badge={CATEGORY_NAMES[service.category] || service.category}
-                      aspectRatioClass="aspect-[16/10]"
-                      allowExpand={true}
-                    />
-                  ) : (
-                    <div className="relative aspect-[16/10] w-full overflow-hidden bg-ivory border-b border-charcoal/10 flex flex-col items-center justify-center p-6 text-center text-taupe">
-                      <Sparkles className="h-6 w-6 opacity-40 mb-1" />
-                      <span className="text-[10px] uppercase tracking-widest font-medium">
-                        Alshana's Glow
-                      </span>
-                      <div className="absolute top-3 left-3 z-10">
-                        <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
-                          {CATEGORY_NAMES[service.category] || service.category}
+                  {/* Zone Média : Clic réservé à la visualisation, pas de redirection vers la réservation */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    {shouldShowImage(service) && service.imageUrl ? (
+                      <AestheticMediaViewer
+                        url={service.imageUrl}
+                        alt={service.name}
+                        badge={CATEGORY_NAMES[service.category] || service.category}
+                        aspectRatioClass="aspect-[16/10]"
+                        allowExpand={true}
+                        onBook={() => handleBookClick(service, defaultVariant)}
+                      />
+                    ) : (
+                      <div className="relative aspect-[16/10] w-full overflow-hidden bg-ivory border-b border-charcoal/10 flex flex-col items-center justify-center p-6 text-center text-taupe">
+                        <Sparkles className="h-6 w-6 opacity-40 mb-1" />
+                        <span className="text-[10px] uppercase tracking-widest font-medium">
+                          Alshana's Glow
                         </span>
+                        <div className="absolute top-3 left-3 z-10">
+                          <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
+                            {CATEGORY_NAMES[service.category] || service.category}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Contenu sobre : Titre, sous-titre, durée & prix */}
                   <div className="p-5">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h3 className="font-serif text-xl font-medium text-charcoal transition-colors group-hover:text-charcoal/90">
+                        <h3 className="font-serif text-xl font-medium text-charcoal transition-colors">
                           {service.name}
                         </h3>
                         {service.subtitle && (
@@ -122,13 +125,17 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                   </div>
                 </div>
 
-                {/* Bouton d'action direct & minimaliste */}
-                <div className="border-t border-charcoal/10 px-5 py-3.5 bg-ivory/20 flex items-center justify-between transition-colors group-hover:bg-charcoal group-hover:text-ivory">
+                {/* Bouton d'action direct & découplé : Déclenche exclusivement la réservation */}
+                <button
+                  type="button"
+                  onClick={() => handleBookClick(service, defaultVariant)}
+                  className="w-full border-t border-charcoal/10 px-5 py-3.5 bg-ivory/20 flex items-center justify-between transition-colors hover:bg-charcoal hover:text-ivory cursor-pointer group/btn"
+                >
                   <span className="text-[11px] font-medium tracking-widest uppercase">
                     Réserver ce soin
                   </span>
-                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </div>
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5" />
+                </button>
               </div>
             );
           })}
