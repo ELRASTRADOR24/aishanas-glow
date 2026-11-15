@@ -330,6 +330,20 @@ export const AdminPage: React.FC = () => {
     });
   }, [data.bookings, bookingFilter]);
 
+  // Nombre de rendez-vous en attente nécessitant une validation (point rouge + compteur)
+  const pendingBookingsCount = useMemo(() => {
+    return (data.bookings || []).filter((b) => b.status === 'pending').length;
+  }, [data.bookings]);
+
+  // Actualisation automatique en arrière-plan toutes les 25s pour détecter les nouveaux rendez-vous en direct
+  useEffect(() => {
+    if (!adminToken) return;
+    const timer = window.setInterval(() => {
+      refreshAdminStudio().catch(() => {});
+    }, 25000);
+    return () => window.clearInterval(timer);
+  }, [adminToken, refreshAdminStudio]);
+
   const [bookingEdits, setBookingEdits] = useState<
     Record<string, { preferredDate?: string; preferredTime?: string; adminDecisionNote?: string }>
   >({});
@@ -1093,7 +1107,25 @@ export const AdminPage: React.FC = () => {
               <span>Voir le site</span>
             </Link>
             <div>
-              <h1 className="font-serif text-2xl text-ivory">{data.config.brandName} — Admin</h1>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h1 className="font-serif text-2xl text-ivory">{data.config.brandName} — Admin</h1>
+                {pendingBookingsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('bookings');
+                      setBookingFilter('pending');
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/50 bg-rose-500/25 px-2.5 py-0.5 text-xs font-semibold text-rose-200 hover:bg-rose-500/40 transition-colors cursor-pointer"
+                  >
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500"></span>
+                    </span>
+                    <span>{pendingBookingsCount} nouveau{pendingBookingsCount > 1 ? 'x' : ''} à traiter</span>
+                  </button>
+                )}
+              </div>
               <p className="text-[11px] text-stone/75">
                 Validation des rendez-vous, horaires, tarifs et photos du studio
               </p>
@@ -1134,30 +1166,50 @@ export const AdminPage: React.FC = () => {
         className="border-b border-stone bg-white px-4 sm:px-6"
       >
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto py-2">
-          {(
-            [
-              { id: 'services', label: `Prestations & Médias (${data.services.length})` },
-              { id: 'schedule', label: 'Calendrier & Horaires' },
-              { id: 'bookings', label: `Rendez-vous (${data.bookings.length})` },
-              { id: 'content', label: 'Contenus & Textes' },
-              { id: 'emails', label: 'E-mails & Journal' },
-              { id: 'cloudinary', label: 'Paramètres Studio' },
-              { id: 'dashboard', label: 'Vue d’ensemble' },
-            ] as { id: AdminTab; label: string }[]
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`min-h-[44px] shrink-0 border px-4 py-2 text-xs font-medium tracking-wider uppercase transition-colors ${
-                activeTab === tab.id
-                  ? 'border-charcoal bg-charcoal text-ivory'
-                  : 'border-transparent text-taupe hover:border-stone hover:text-charcoal'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {[
+            { id: 'services' as AdminTab, label: `Prestations & Médias (${data.services.length})` },
+            { id: 'schedule' as AdminTab, label: 'Calendrier & Horaires' },
+            {
+              id: 'bookings' as AdminTab,
+              label: 'Rendez-vous',
+              hasBadge: pendingBookingsCount > 0,
+              badgeCount: pendingBookingsCount,
+              totalCount: (data.bookings || []).length,
+            },
+            { id: 'content' as AdminTab, label: 'Contenus & Textes' },
+            { id: 'emails' as AdminTab, label: 'E-mails & Journal' },
+            { id: 'cloudinary' as AdminTab, label: 'Paramètres Studio' },
+            { id: 'dashboard' as AdminTab, label: 'Vue d’ensemble' },
+          ].map((tab) => {
+            const isBookings = tab.id === 'bookings';
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative inline-flex min-h-[44px] shrink-0 items-center gap-2 border px-4 py-2 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer ${
+                  activeTab === tab.id
+                    ? 'border-charcoal bg-charcoal text-ivory'
+                    : 'border-transparent text-taupe hover:border-stone hover:text-charcoal'
+                }`}
+              >
+                <span>
+                  {tab.label}
+                  {isBookings && ` (${tab.totalCount})`}
+                </span>
+
+                {isBookings && tab.hasBadge && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-200 opacity-75"></span>
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-white"></span>
+                    </span>
+                    <span>{tab.badgeCount}</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </nav>
 
@@ -1527,18 +1579,40 @@ export const AdminPage: React.FC = () => {
                               ? 'Terminés'
                               : 'Tout l’historique';
 
+                    const isPending = st === 'pending';
+                    const hasPendingNotice = isPending && count > 0;
+
                     return (
                       <button
                         key={st}
                         type="button"
                         onClick={() => setBookingFilter(st)}
-                        className={`min-h-[40px] border px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
+                        className={`inline-flex min-h-[40px] items-center gap-2 border px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
                           bookingFilter === st
                             ? 'border-charcoal bg-charcoal text-ivory'
-                            : 'border-stone bg-white text-charcoal hover:border-charcoal'
+                            : hasPendingNotice
+                              ? 'border-rose-300 bg-rose-50 text-rose-900 hover:border-rose-400'
+                              : 'border-stone bg-white text-charcoal hover:border-charcoal'
                         }`}
                       >
-                        {label} ({count})
+                        {hasPendingNotice && (
+                          <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-75"></span>
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-600"></span>
+                          </span>
+                        )}
+                        <span>{label}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                            hasPendingNotice
+                              ? 'bg-rose-600 text-white'
+                              : bookingFilter === st
+                                ? 'bg-white/20 text-ivory'
+                                : 'bg-stone/20 text-charcoal'
+                          }`}
+                        >
+                          {count}
+                        </span>
                       </button>
                     );
                   }
