@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertCircle,
@@ -135,6 +135,20 @@ function formatCompactFrenchDate(dateStr: string): string {
     month: 'short',
     year: 'numeric',
   }).format(new Date(year, month - 1, day));
+}
+
+function formatExactDateTime(isoString?: string): string {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
 }
 
 function buildSupplementNote(params: {
@@ -290,8 +304,8 @@ export const AdminPage: React.FC = () => {
   const [cropImageSrc, setCropImageSrc] = useState('');
   const [cropFileName, setCropFileName] = useState('photo-studio.webp');
 
-  // Bookings filter & decision edits
-  const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'all'>('all');
+  // Bookings filter & decision edits (par défaut sur les demandes en attente)
+  const [bookingFilter, setBookingFilter] = useState<BookingStatus | 'all'>('pending');
   const [bookingEdits, setBookingEdits] = useState<
     Record<string, { preferredDate?: string; preferredTime?: string; adminDecisionNote?: string }>
   >({});
@@ -470,10 +484,19 @@ export const AdminPage: React.FC = () => {
     );
   }
 
-  const filteredBookings =
-    bookingFilter === 'all'
-      ? data.bookings
-      : data.bookings.filter((b) => b.status === bookingFilter);
+  const filteredBookings: BookingRequest[] = useMemo(() => {
+    const list =
+      bookingFilter === 'all'
+        ? [...data.bookings]
+        : data.bookings.filter((b) => b.status === bookingFilter);
+
+    // Tri chronologique : plus récentes demandes reçues en premier
+    return list.sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return timeB - timeA;
+    });
+  }, [data.bookings, bookingFilter]);
 
   const handleBookingDecision = async (booking: BookingRequest, nextStatus: BookingStatus) => {
     const edits = bookingEdits[booking.id] || {};
@@ -1457,24 +1480,36 @@ export const AdminPage: React.FC = () => {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {(['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const).map(
+                {(['pending', 'confirmed', 'cancelled', 'completed', 'all'] as const).map(
                   (st) => {
                     const count =
                       st === 'all'
                         ? data.bookings.length
                         : data.bookings.filter((b) => b.status === st).length;
+
+                    const label =
+                      st === 'pending'
+                        ? 'À traiter (en attente)'
+                        : st === 'confirmed'
+                          ? 'Confirmés'
+                          : st === 'cancelled'
+                            ? 'Refusés / Annulés'
+                            : st === 'completed'
+                              ? 'Terminés'
+                              : 'Tout l’historique';
+
                     return (
                       <button
                         key={st}
                         type="button"
                         onClick={() => setBookingFilter(st)}
-                        className={`min-h-[40px] border px-3 py-1.5 text-xs uppercase ${
+                        className={`min-h-[40px] border px-3.5 py-1.5 text-xs font-medium uppercase tracking-wider transition-colors cursor-pointer ${
                           bookingFilter === st
                             ? 'border-charcoal bg-charcoal text-ivory'
-                            : 'border-stone bg-white text-charcoal'
+                            : 'border-stone bg-white text-charcoal hover:border-charcoal'
                         }`}
                       >
-                        {st === 'all' ? 'Toutes' : STATUS_LABELS[st]} ({count})
+                        {label} ({count})
                       </button>
                     );
                   }
@@ -1489,8 +1524,9 @@ export const AdminPage: React.FC = () => {
                   Aucune demande dans cette catégorie
                 </p>
                 <p className="mt-1 text-xs text-taupe">
-                  Lorsqu’une cliente réserve un créneau sur le site, sa fiche apparaît ici pour
-                  validation manuelle.
+                  {bookingFilter === 'pending'
+                    ? 'Toutes les demandes ont été traitées ! Consultez les onglets Confirmés ou Historique pour voir les réservations précédentes.'
+                    : 'Lorsqu’une cliente réserve un créneau sur le site, sa fiche apparaît ici.'}
                 </p>
               </div>
             ) : (
@@ -1518,22 +1554,32 @@ export const AdminPage: React.FC = () => {
                     >
                       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-stone/60 pb-4">
                         <div>
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-medium tracking-widest uppercase ${
-                              isConfirmed
-                                ? 'bg-emerald-100 text-emerald-950'
-                                : booking.status === 'cancelled'
-                                  ? 'bg-red-100 text-red-950'
-                                  : isPending
-                                    ? 'bg-amber-100 text-amber-950'
-                                    : 'bg-stone/40 text-charcoal'
-                            }`}
-                          >
-                            {isConfirmed && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
-                            <span>
-                              {booking.reference} · {STATUS_LABELS[booking.status]}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-medium tracking-widest uppercase ${
+                                isConfirmed
+                                  ? 'bg-emerald-100 text-emerald-950'
+                                  : booking.status === 'cancelled'
+                                    ? 'bg-red-100 text-red-950'
+                                    : isPending
+                                      ? 'bg-amber-100 text-amber-950 font-semibold'
+                                      : 'bg-stone/40 text-charcoal'
+                              }`}
+                            >
+                              {isConfirmed && <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
+                              {booking.status === 'cancelled' && <XCircle className="h-3.5 w-3.5" aria-hidden="true" />}
+                              <span>
+                                {booking.reference} · {STATUS_LABELS[booking.status]}
+                              </span>
                             </span>
-                          </span>
+
+                            {booking.createdAt && (
+                              <span className="inline-flex items-center gap-1 border border-stone/80 bg-stone/20 px-2.5 py-0.5 text-[10px] text-charcoal font-medium">
+                                <Clock className="h-3 w-3 text-taupe" />
+                                <span>Demande reçue le {formatExactDateTime(booking.createdAt)}</span>
+                              </span>
+                            )}
+                          </div>
                           <h3 className="mt-1.5 font-serif text-2xl text-charcoal">
                             {booking.clientName}
                           </h3>

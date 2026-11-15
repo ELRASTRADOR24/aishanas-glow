@@ -1378,7 +1378,7 @@ app.put('/api/admin/studio', requireAdmin, async (req, res) => {
 });
 
 app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
-  const studio = loadStudio();
+  const studio = await getStudioData();
   const { id } = req.params;
   const idx = (studio.bookings || []).findIndex((b) => b.id === id);
   if (idx === -1) {
@@ -1423,8 +1423,8 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
   };
 
   studio.bookings[idx] = updated;
-  saveStudio(studio);
-  BookingModel.findOneAndUpdate({ id: updated.id }, updated, { upsert: true }).catch(() => {});
+  await saveStudio(studio);
+  await BookingModel.findOneAndUpdate({ id: updated.id }, updated, { upsert: true }).catch(() => {});
 
   let emailNotification = null;
 
@@ -1528,11 +1528,11 @@ app.patch('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
   res.json({ booking: updated, emailNotification, studio: buildAdminStudio(studio) });
 });
 
-app.delete('/api/admin/bookings/:id', requireAdmin, (req, res) => {
-  const studio = loadStudio();
+app.delete('/api/admin/bookings/:id', requireAdmin, async (req, res) => {
+  const studio = await getStudioData();
   studio.bookings = (studio.bookings || []).filter((b) => b.id !== req.params.id);
-  saveStudio(studio);
-  BookingModel.deleteOne({ id: req.params.id }).catch(() => {});
+  await saveStudio(studio);
+  await BookingModel.deleteOne({ id: req.params.id }).catch(() => {});
   res.json({ studio: buildAdminStudio(studio) });
 });
 
