@@ -116,7 +116,9 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
       <div
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        className={`group relative ${aspectRatioClass} w-full overflow-hidden bg-obsidian border-b border-charcoal/10 select-none ${className}`}
+        onClick={openModal}
+        title={isVideo ? 'Cliquer pour visionner la vidéo en grand format' : "Cliquer pour agrandir l'image"}
+        className={`group relative ${aspectRatioClass} w-full overflow-hidden bg-obsidian border-b border-charcoal/10 select-none cursor-pointer ${className}`}
       >
         {isVideo ? (
           <div className="relative h-full w-full overflow-hidden">
@@ -149,10 +151,10 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
               className={`relative z-10 h-full w-full ${isVerticalVideo ? 'object-contain mx-auto' : 'object-cover'} transition-transform duration-500 group-hover:scale-105`}
             />
 
-            {/* Custom Aesthetic Controls Overlay */}
+            {/* Custom Aesthetic Controls Overlay avec z-20 pour une interactivité immédiate */}
             {showControls && (
               <div
-                className={`absolute inset-0 flex flex-col justify-between bg-gradient-to-t from-obsidian/80 via-transparent to-obsidian/30 p-3 transition-opacity duration-300 ${
+                className={`absolute inset-0 z-20 flex flex-col justify-between bg-gradient-to-t from-obsidian/80 via-transparent to-obsidian/30 p-3 transition-opacity duration-300 ${
                   isHovered || !isPlaying ? 'opacity-100' : 'opacity-0'
                 }`}
               >
@@ -172,24 +174,30 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
                     <button
                       type="button"
                       onClick={openModal}
-                      aria-label="Agrandir la vidéo"
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-obsidian/70 text-ivory backdrop-blur-xs transition-colors hover:bg-obsidian hover:text-white"
+                      aria-label="Visionner en plein écran"
+                      title="Visionner en plein écran"
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-obsidian/80 text-ivory backdrop-blur-xs transition-colors hover:bg-ivory hover:text-charcoal cursor-pointer"
                     >
-                      <Maximize2 className="h-3.5 w-3.5" />
+                      <Maximize2 className="h-4 w-4" />
                     </button>
                   )}
                 </div>
 
-                {/* Center subtle Play/Pause button */}
-                <div className="flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={togglePlay}
-                    aria-label={isPlaying ? 'Pause' : 'Lecture'}
-                    className="flex h-11 w-11 items-center justify-center rounded-full border border-ivory/30 bg-obsidian/80 text-ivory backdrop-blur-md transition-all hover:scale-110 hover:border-ivory cursor-pointer"
-                  >
-                    {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-0.5" />}
-                  </button>
+                {/* Center subtle Play/Pause & View Prompt */}
+                <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                  <div className="pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={togglePlay}
+                      aria-label={isPlaying ? 'Pause' : 'Lecture'}
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-ivory/40 bg-obsidian/85 text-ivory backdrop-blur-md shadow-lg transition-all hover:scale-110 hover:border-ivory cursor-pointer"
+                    >
+                      {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 translate-x-0.5" />}
+                    </button>
+                  </div>
+                  <span className="text-[9px] tracking-wider text-ivory/90 uppercase font-medium drop-shadow-sm">
+                    {isPlaying ? 'Pause' : 'Lire'} · Cliquez pour agrandir
+                  </span>
                 </div>
 
                 {/* Bottom toolbar with progress & sound */}
@@ -199,10 +207,18 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
                       type="button"
                       onClick={toggleMute}
                       aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
-                      className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/10"
+                      className="flex items-center gap-1 rounded bg-obsidian/60 px-2 py-0.5 text-ivory backdrop-blur-xs hover:bg-obsidian cursor-pointer"
                     >
                       {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                      <span className="text-[9px] tracking-wider uppercase">{isMuted ? 'Muet' : 'Son'}</span>
+                      <span className="text-[9px] tracking-wider uppercase">{isMuted ? 'Son coupé' : 'Son activé'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={openModal}
+                      className="text-[9px] tracking-widest uppercase text-ivory/80 hover:text-white"
+                    >
+                      Plein écran ↗
                     </button>
                   </div>
 
