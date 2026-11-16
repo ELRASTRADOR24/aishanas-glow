@@ -217,12 +217,14 @@ function formatEmailDetailHuman(log: EmailLogEntry): string {
   return 'L’envoi n’a pas pu aboutir pour le moment (vérifiez l’adresse de destination).';
 }
 
-const CATEGORY_OPTIONS: { value: ServiceCategory; label: string }[] = [
-  { value: 'extensions', label: 'Extensions de cils' },
-  { value: 'depose', label: 'Dépose' },
-  { value: 'rehaussement', label: 'Rehaussement de cils' },
-  { value: 'blanchiment', label: 'Blanchiment dentaire' },
-];
+function formatDuration(minutes?: number): string {
+  const mins = Number(minutes) || 120;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m} min`;
+  return `${h}h${m < 10 ? '0' : ''}${m}`;
+}
 
 export const AdminPage: React.FC = () => {
   const {
@@ -278,6 +280,8 @@ export const AdminPage: React.FC = () => {
   const [isServiceModalOpen, setIsServiceModalOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [isCreatingService, setIsCreatingService] = useState(false);
+  const [isAddingNewCategory, setIsAddingNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const [serviceForm, setServiceForm] = useState<{
     name: string;
     category: ServiceCategory;
@@ -288,6 +292,7 @@ export const AdminPage: React.FC = () => {
     imageUrl: string;
     showImage: boolean;
     active: boolean;
+    mediaFormat: 'dynamic' | 'vertical' | 'square' | 'horizontal';
   }>({
     name: '',
     category: 'extensions',
@@ -298,6 +303,7 @@ export const AdminPage: React.FC = () => {
     imageUrl: '',
     showImage: true,
     active: true,
+    mediaFormat: 'dynamic',
   });
   const [savingService, setSavingService] = useState(false);
   const [uploadingMedia, setUploadingMedia] = useState(false);
@@ -305,10 +311,11 @@ export const AdminPage: React.FC = () => {
   const [showManualUrl, setShowManualUrl] = useState(false);
 
   // File input refs for direct single-click triggering
+  const directImageFileInputRef = useRef<HTMLInputElement | null>(null);
   const imageFileInputRef = useRef<HTMLInputElement | null>(null);
   const videoFileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Interactive 16:10 Image Cropping Modal State
+  // Interactive Image Cropping Modal State
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState('');
   const [cropFileName, setCropFileName] = useState('photo-studio.webp');
@@ -359,6 +366,48 @@ export const AdminPage: React.FC = () => {
 
   // Services accordion & filter
   const [serviceCategoryFilter, setServiceCategoryFilter] = useState<string>('all');
+
+  const allCategoriesOptions = useMemo(() => {
+    const defaultCats = [
+      { value: 'extensions', label: 'Extensions de cils' },
+      { value: 'depose', label: 'Dépose' },
+      { value: 'rehaussement', label: 'Rehaussement de cils' },
+      { value: 'blanchiment', label: 'Blanchiment dentaire' },
+    ];
+    const customCats: { value: string; label: string }[] = [];
+    (data.services || []).forEach((s) => {
+      if (
+        s.category &&
+        !defaultCats.some((c) => c.value === s.category) &&
+        !customCats.some((c) => c.value === s.category)
+      ) {
+        customCats.push({
+          value: s.category,
+          label: s.category.charAt(0).toUpperCase() + s.category.slice(1).replace(/-/g, ' '),
+        });
+      }
+    });
+    return [...defaultCats, ...customCats];
+  }, [data.services]);
+
+  const categoryFilterList = useMemo(() => {
+    const list = [
+      { id: 'all', label: 'Toutes les prestations' },
+      { id: 'extensions', label: 'Extensions' },
+      { id: 'depose', label: 'Déposes' },
+      { id: 'rehaussement', label: 'Rehaussement' },
+      { id: 'blanchiment', label: 'Blanchiment' },
+    ];
+    (data.services || []).forEach((s) => {
+      if (s.category && !list.some((c) => c.id === s.category)) {
+        list.push({
+          id: s.category,
+          label: s.category.charAt(0).toUpperCase() + s.category.slice(1).replace(/-/g, ' '),
+        });
+      }
+    });
+    return list;
+  }, [data.services]);
   // Schedule rules inputs
   const tomorrowIso = new Date(Date.now() + 86400000).toISOString().split('T')[0];
   const [newHolidayDate, setNewHolidayDate] = useState('');
@@ -915,6 +964,8 @@ export const AdminPage: React.FC = () => {
   const openCreateServiceModal = () => {
     setEditingService(null);
     setIsCreatingService(true);
+    setIsAddingNewCategory(false);
+    setNewCategoryName('');
     setServiceForm({
       name: '',
       category: 'extensions',
@@ -925,6 +976,7 @@ export const AdminPage: React.FC = () => {
       imageUrl: '',
       showImage: true,
       active: true,
+      mediaFormat: 'dynamic',
     });
     setShowManualUrl(false);
     setIsServiceModalOpen(true);
@@ -933,19 +985,47 @@ export const AdminPage: React.FC = () => {
   const openEditServiceModal = (service: ServiceItem) => {
     setEditingService(service);
     setIsCreatingService(false);
+    setIsAddingNewCategory(false);
+    setNewCategoryName('');
     setServiceForm({
       name: service.name,
       category: service.category,
       fullPrice: service.fullPrice,
       refillPrice: service.refillPrice ?? null,
-      durationMinutes: 120, // 2h uniforme
+      durationMinutes: Number(service.durationMinutes) || 120,
       description: service.description || '',
       imageUrl: service.imageUrl || '',
       showImage: service.showImage !== false,
       active: service.active !== false,
+      mediaFormat: service.mediaFormat || 'dynamic',
     });
     setShowManualUrl(false);
     setIsServiceModalOpen(true);
+  };
+
+  const handleSelectImageDirect = async (file: File) => {
+    if (!file) return;
+    setUploadingMedia(true);
+    setUploadProgress(0);
+    try {
+      const res = await uploadMediaWithProgress(
+        file,
+        file.name,
+        data.config.cloudinary,
+        (pct) => setUploadProgress(pct)
+      );
+      setServiceForm((prev) => ({
+        ...prev,
+        imageUrl: res.url,
+        showImage: true,
+      }));
+      notify('Photo importée dans son format d’origine avec succès !');
+    } catch (err: any) {
+      notifyError(err?.message || "Erreur lors de l'envoi de la photo.");
+    } finally {
+      setUploadingMedia(false);
+      setUploadProgress(0);
+    }
   };
 
   const handleSelectImageForCrop = (file: File) => {
@@ -1020,20 +1100,26 @@ export const AdminPage: React.FC = () => {
     }
     setSavingService(true);
     try {
+      const finalCategory =
+        isAddingNewCategory && newCategoryName.trim()
+          ? newCategoryName.trim().toLowerCase().replace(/\s+/g, '-')
+          : serviceForm.category;
+
       const servicePayload: ServiceItem = {
         id: editingService ? editingService.id : `srv-${Date.now()}`,
-        category: serviceForm.category,
+        category: finalCategory,
         name: serviceForm.name.trim(),
         subtitle: editingService?.subtitle || '',
         fullPrice: Number(serviceForm.fullPrice) || 0,
         fullLabel: editingService?.fullLabel || 'Pose complète',
         refillPrice: serviceForm.refillPrice != null ? Number(serviceForm.refillPrice) : null,
         refillLabel: editingService?.refillLabel || 'Remplissage 3 semaines',
-        durationMinutes: 120, // 2h uniforme
+        durationMinutes: Math.max(15, Number(serviceForm.durationMinutes) || 120),
         description: serviceForm.description.trim(),
         imageUrl: serviceForm.imageUrl.trim(),
         showImage: serviceForm.showImage,
         active: serviceForm.active,
+        mediaFormat: serviceForm.mediaFormat || 'dynamic',
         supportsLashOptions: editingService?.supportsLashOptions ?? false,
       };
 
@@ -2738,11 +2824,11 @@ export const AdminPage: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="font-serif text-3xl text-charcoal">Prestations &amp; Tarifs</h2>
                   <span className="inline-flex items-center border border-charcoal/20 bg-ivory px-2.5 py-0.5 text-[10px] font-semibold tracking-wider text-charcoal uppercase">
-                    Durée uniforme : 2h par soin
+                    Durées &amp; Visuels sur-mesure
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-taupe">
-                  Chaque prestation dispose d’une durée fixe de 2 heures. Modifiez vos prix, photos avec recadrage sur-mesure (16:10) et vidéos HD directement sur le soin.
+                  Modifiez vos prix, durées précises, photos sans coupure (formats vertical smartphone, carré, paysage) et vidéos HD pour chaque soin.
                 </p>
               </div>
 
@@ -2786,13 +2872,7 @@ export const AdminPage: React.FC = () => {
 
             {/* Filtres par catégorie */}
             <div className="flex flex-wrap items-center gap-2">
-              {[
-                { id: 'all', label: 'Toutes les prestations' },
-                { id: 'extensions', label: 'Extensions' },
-                { id: 'depose', label: 'Déposes' },
-                { id: 'rehaussement', label: 'Rehaussement' },
-                { id: 'blanchiment', label: 'Blanchiment' },
-              ].map((cat) => {
+              {categoryFilterList.map((cat) => {
                 const count =
                   cat.id === 'all'
                     ? data.services.length
@@ -2816,7 +2896,7 @@ export const AdminPage: React.FC = () => {
             </div>
 
             {/* Grille responsive des Prestations */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 items-start">
               {data.services
                 .filter((s) => serviceCategoryFilter === 'all' || s.category === serviceCategoryFilter)
                 .map((service) => {
@@ -2831,19 +2911,20 @@ export const AdminPage: React.FC = () => {
                       className="group flex flex-col justify-between border border-stone bg-white shadow-xs hover:border-charcoal transition-all"
                     >
                       <div>
-                        {/* Aperçu du média (Photo ou Vidéo) */}
-                        <div className="relative aspect-[16/10] w-full overflow-hidden bg-obsidian border-b border-stone/50">
+                        {/* Aperçu du média (Photo ou Vidéo) avec format dynamique */}
+                        <div className="relative w-full overflow-hidden bg-obsidian border-b border-stone/50">
                           {service.imageUrl ? (
                             <AestheticMediaViewer
                               url={service.imageUrl}
                               alt={service.name}
                               badge={service.category}
-                              aspectRatioClass="aspect-[16/10]"
+                              aspectRatioClass="dynamic"
+                              mediaFormat={service.mediaFormat || 'dynamic'}
                               allowExpand={true}
                               className={isImageShownOnSite ? '' : 'opacity-50 grayscale'}
                             />
                           ) : (
-                            <div className="h-full w-full flex flex-col items-center justify-center p-4 text-center bg-ivory text-taupe">
+                            <div className="aspect-[16/10] w-full flex flex-col items-center justify-center p-4 text-center bg-ivory text-taupe">
                               <Sparkles className="h-6 w-6 opacity-30 mb-1" />
                               <span className="text-[10px] uppercase tracking-wider">
                                 Aucun visuel défini
@@ -2890,7 +2971,7 @@ export const AdminPage: React.FC = () => {
 
                           <div className="flex items-center gap-2">
                             <span className="inline-flex items-center border border-charcoal/10 bg-ivory px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
-                              Durée : 2h
+                              Durée : {formatDuration(service.durationMinutes)}
                             </span>
                             {service.active ? (
                               <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 border border-emerald-200 font-medium">
@@ -3005,7 +3086,7 @@ export const AdminPage: React.FC = () => {
                             Photo ou Vidéo du soin
                           </h4>
                           <p className="text-xs text-taupe">
-                            Cadrage 16:10 garanti. Recadrez la photo à votre guise ou liez une vidéo HD.
+                            Format dynamique : les photos verticales de smartphone, carrées ou horizontales s'affichent sans coupure.
                           </p>
                         </div>
 
@@ -3017,17 +3098,18 @@ export const AdminPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Aperçu direct en 16:10 */}
-                      <div className="relative aspect-[16/10] w-full overflow-hidden border border-stone bg-obsidian">
+                      {/* Aperçu direct avec adaptation dynamique au format */}
+                      <div className="relative w-full overflow-hidden border border-stone bg-obsidian">
                         {serviceForm.imageUrl ? (
                           <AestheticMediaViewer
                             url={serviceForm.imageUrl}
                             alt={serviceForm.name}
-                            aspectRatioClass="aspect-[16/10]"
+                            aspectRatioClass="dynamic"
+                            mediaFormat={serviceForm.mediaFormat || 'dynamic'}
                             allowExpand={true}
                           />
                         ) : (
-                          <div className="h-full w-full flex flex-col items-center justify-center p-6 text-center text-taupe bg-ivory">
+                          <div className="aspect-[16/10] w-full flex flex-col items-center justify-center p-6 text-center text-taupe bg-ivory">
                             <Sparkles className="h-8 w-8 opacity-30 mb-2" />
                             <span className="text-xs uppercase tracking-wider font-medium">
                               Aucun visuel associé
@@ -3060,6 +3142,18 @@ export const AdminPage: React.FC = () => {
 
                       {/* Inputs cachés déclenchés par les boutons clairs */}
                       <input
+                        ref={directImageFileInputRef}
+                        type="file"
+                        accept="image/*,.heic,.jpg,.jpeg,.png,.webp"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSelectImageDirect(file);
+                          e.target.value = '';
+                        }}
+                        className="hidden"
+                      />
+
+                      <input
                         ref={imageFileInputRef}
                         type="file"
                         accept="image/*,.heic,.jpg,.jpeg,.png,.webp"
@@ -3083,16 +3177,28 @@ export const AdminPage: React.FC = () => {
                         className="hidden"
                       />
 
-                      {/* Boutons d'action directs et compréhensibles */}
+                      {/* Boutons d'action clairs */}
                       <div className="flex flex-wrap items-center gap-2.5 pt-1">
                         <button
                           type="button"
                           disabled={uploadingMedia}
-                          onClick={() => imageFileInputRef.current?.click()}
+                          onClick={() => directImageFileInputRef.current?.click()}
+                          title="Importer la photo dans son format exact sans recadrage"
                           className="min-h-[44px] inline-flex items-center gap-2 border border-charcoal bg-charcoal px-4 py-2 text-xs font-semibold tracking-wider text-ivory uppercase hover:bg-silk transition-colors disabled:opacity-50 cursor-pointer"
                         >
                           <Upload className="h-4 w-4" />
-                          <span>Changer la photo (avec recadrage)</span>
+                          <span>Importer photo (format direct sans coupe)</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={uploadingMedia}
+                          onClick={() => imageFileInputRef.current?.click()}
+                          title="Ajuster le cadrage ou choisir un format précis (vertical smartphone, carré, paysage)"
+                          className="min-h-[44px] inline-flex items-center gap-2 border border-stone bg-white px-4 py-2 text-xs font-semibold tracking-wider text-charcoal uppercase hover:border-charcoal transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <Crop className="h-4 w-4" />
+                          <span>Ajuster / Recadrer la photo</span>
                         </button>
 
                         <button
@@ -3112,7 +3218,7 @@ export const AdminPage: React.FC = () => {
                             className="min-h-[44px] inline-flex items-center gap-1.5 border border-stone bg-white px-3 py-2 text-xs font-medium text-charcoal hover:border-charcoal transition-colors cursor-pointer"
                           >
                             <Crop className="h-3.5 w-3.5" />
-                            <span>Ajuster le cadrage</span>
+                            <span>Modifier le cadrage actuel</span>
                           </button>
                         )}
 
@@ -3130,6 +3236,62 @@ export const AdminPage: React.FC = () => {
                             Retirer le visuel
                           </button>
                         )}
+                      </div>
+
+                      {/* Option de format de carte */}
+                      <div className="border border-stone/60 bg-white p-4 space-y-2 mt-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-charcoal uppercase tracking-wider block">
+                            Format d’affichage de la carte
+                          </label>
+                          <span className="text-[11px] text-taupe font-medium">
+                            {serviceForm.mediaFormat === 'vertical'
+                              ? '📱 Vertical (4:5 / 9:16)'
+                              : serviceForm.mediaFormat === 'square'
+                              ? '⏹️ Carré (1:1)'
+                              : serviceForm.mediaFormat === 'horizontal'
+                              ? '🖥️ Paysage (16:10)'
+                              : '✨ Dynamique (Auto)'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-taupe leading-relaxed">
+                          En mode <strong>Dynamique</strong>, la carte s'allonge ou s'adapte automatiquement au ratio d'origine de votre photo ou vidéo (vertical smartphone, carré, paysage) sans couper l'image.
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                          {[
+                            { id: 'dynamic', label: '✨ Dynamique', sub: 'Recommandé' },
+                            { id: 'vertical', label: '📱 Vertical', sub: 'Smartphone' },
+                            { id: 'square', label: '⏹️ Carré', sub: '1:1' },
+                            { id: 'horizontal', label: '🖥️ Paysage', sub: '16:10' },
+                          ].map((fmt) => (
+                            <button
+                              key={fmt.id}
+                              type="button"
+                              onClick={() =>
+                                setServiceForm((prev) => ({
+                                  ...prev,
+                                  mediaFormat: fmt.id as any,
+                                }))
+                              }
+                              className={`min-h-[42px] p-2 border text-left flex flex-col justify-center transition-colors cursor-pointer ${
+                                (serviceForm.mediaFormat || 'dynamic') === fmt.id
+                                  ? 'border-charcoal bg-charcoal text-ivory font-bold'
+                                  : 'border-stone bg-ivory/30 text-charcoal hover:border-charcoal'
+                              }`}
+                            >
+                              <span className="text-xs">{fmt.label}</span>
+                              <span
+                                className={`text-[10px] ${
+                                  (serviceForm.mediaFormat || 'dynamic') === fmt.id
+                                    ? 'text-ivory/80'
+                                    : 'text-taupe'
+                                }`}
+                              >
+                                {fmt.sub}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Lien discret pour les options avancées d'URL */}
@@ -3179,25 +3341,59 @@ export const AdminPage: React.FC = () => {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
-                          Catégorie *
-                        </label>
-                        <select
-                          value={serviceForm.category}
-                          onChange={(e) =>
-                            setServiceForm((prev) => ({
-                              ...prev,
-                              category: e.target.value as ServiceCategory,
-                            }))
-                          }
-                          className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm"
-                        >
-                          {CATEGORY_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-medium uppercase tracking-wider text-charcoal">
+                            Catégorie *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingNewCategory(!isAddingNewCategory);
+                              if (!isAddingNewCategory) setNewCategoryName('');
+                            }}
+                            className="text-[11px] font-semibold text-charcoal underline hover:text-stone transition-colors cursor-pointer"
+                          >
+                            {isAddingNewCategory ? 'Choisir catégorie existante' : '+ Créer une catégorie'}
+                          </button>
+                        </div>
+
+                        {isAddingNewCategory ? (
+                          <div className="mt-1">
+                            <input
+                              type="text"
+                              required
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              placeholder="Nom de la nouvelle catégorie (ex. Beauté du regard, Onglerie...)"
+                              className="min-h-[44px] w-full border border-stone bg-white px-3 text-sm focus:border-charcoal focus:outline-hidden"
+                            />
+                            <p className="mt-1 text-[11px] text-taupe">
+                              Cette catégorie sera créée et apparaîtra automatiquement dans vos filtres.
+                            </p>
+                          </div>
+                        ) : (
+                          <select
+                            value={serviceForm.category}
+                            onChange={(e) => {
+                              if (e.target.value === '__NEW__') {
+                                setIsAddingNewCategory(true);
+                              } else {
+                                setServiceForm((prev) => ({
+                                  ...prev,
+                                  category: e.target.value as ServiceCategory,
+                                }));
+                              }
+                            }}
+                            className="mt-1 min-h-[44px] w-full border border-stone bg-white px-3 text-sm cursor-pointer"
+                          >
+                            {allCategoriesOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                            <option value="__NEW__">➕ + Créer une nouvelle catégorie...</option>
+                          </select>
+                        )}
                       </div>
 
                       <div>
@@ -3237,19 +3433,69 @@ export const AdminPage: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Durée uniforme de 2h */}
-                    <div className="border border-stone/60 bg-ivory/50 p-3.5 flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-semibold text-charcoal uppercase tracking-wider">
-                          Durée de la prestation
+                    {/* Durée de la prestation modifiable */}
+                    <div className="border border-stone/60 bg-ivory/50 p-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <label className="text-xs font-semibold text-charcoal uppercase tracking-wider block">
+                            Durée de la prestation *
+                          </label>
+                          <p className="text-[11px] text-taupe mt-0.5">
+                            Définit la longueur du créneau réservé dans votre agenda pour ce soin.
+                          </p>
+                        </div>
+                        <span className="border border-charcoal bg-charcoal text-ivory px-3 py-1 text-xs font-bold tracking-widest uppercase">
+                          {formatDuration(serviceForm.durationMinutes)} ({serviceForm.durationMinutes} min)
                         </span>
-                        <p className="text-[11px] text-taupe">
-                          Conformément aux règles du studio, tous les soins durent 2 heures pour le créneau client.
-                        </p>
                       </div>
-                      <span className="border border-charcoal bg-charcoal text-ivory px-3 py-1 text-xs font-bold tracking-widest uppercase">
-                        2 heures (120 min)
-                      </span>
+
+                      {/* Sélecteur rapide par boutons */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {[
+                          { label: '30 min', val: 30 },
+                          { label: '45 min', val: 45 },
+                          { label: '1h', val: 60 },
+                          { label: '1h15', val: 75 },
+                          { label: '1h30', val: 90 },
+                          { label: '2h', val: 120 },
+                          { label: '2h30', val: 150 },
+                          { label: '3h', val: 180 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.val}
+                            type="button"
+                            onClick={() =>
+                              setServiceForm((prev) => ({ ...prev, durationMinutes: preset.val }))
+                            }
+                            className={`min-h-[32px] px-2.5 py-1 text-xs font-medium border transition-colors cursor-pointer ${
+                              serviceForm.durationMinutes === preset.val
+                                ? 'border-charcoal bg-charcoal text-ivory font-bold'
+                                : 'border-stone/60 bg-white text-charcoal hover:border-charcoal'
+                            }`}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Champ numérique personnalisé */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-xs text-taupe">Ou saisie personnalisée :</span>
+                        <input
+                          type="number"
+                          min="15"
+                          step="5"
+                          value={serviceForm.durationMinutes}
+                          onChange={(e) =>
+                            setServiceForm((prev) => ({
+                              ...prev,
+                              durationMinutes: Math.max(15, Number(e.target.value) || 120),
+                            }))
+                          }
+                          className="h-9 w-24 border border-stone bg-white px-2.5 text-center text-xs font-bold text-charcoal"
+                        />
+                        <span className="text-xs text-taupe">minutes</span>
+                      </div>
                     </div>
 
                     <div>

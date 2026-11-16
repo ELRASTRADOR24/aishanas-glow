@@ -1,4 +1,5 @@
-export type ServiceCategory = 'extensions' | 'depose' | 'rehaussement' | 'blanchiment';
+export type StandardCategory = 'extensions' | 'depose' | 'rehaussement' | 'blanchiment';
+export type ServiceCategory = StandardCategory | (string & {});
 
 export interface ServiceItem {
   id: string;
@@ -14,6 +15,7 @@ export interface ServiceItem {
   note?: string;
   imageUrl?: string;
   showImage?: boolean;
+  mediaFormat?: 'dynamic' | 'vertical' | 'square' | 'horizontal';
   supportsLashOptions?: boolean;
   active: boolean;
 }

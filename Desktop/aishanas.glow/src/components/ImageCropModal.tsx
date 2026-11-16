@@ -8,9 +8,6 @@ import {
   Move,
   Sparkles,
   Loader2,
-  Smartphone,
-  Tablet,
-  Monitor,
 } from 'lucide-react';
 
 interface ImageCropModalProps {
@@ -19,8 +16,10 @@ interface ImageCropModalProps {
   fileName?: string;
   onClose: () => void;
   onCropComplete: (croppedBlob: Blob, croppedFileName: string) => Promise<void> | void;
-  aspectRatio?: number; // default: 16 / 10 = 1.6
+  aspectRatio?: number;
 }
+
+type AspectPresetKey = 'original' | 'portrait_9_16' | 'portrait_4_5' | 'square' | 'landscape_16_10';
 
 export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   isOpen,
@@ -35,18 +34,40 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
-  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'tablet' | 'desktop'>('mobile');
+
+  // Dynamic aspect ratio & natural dimensions
+  const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [activeRatioKey, setActiveRatioKey] = useState<AspectPresetKey>('original');
+  const [currentRatio, setCurrentRatio] = useState<number>(aspectRatio);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
 
-  // Reset controls when opened
+  // Measure natural dimensions and set initial ratio dynamically (default to natural / vertical format)
   useEffect(() => {
-    if (isOpen) {
-      setZoom(1);
-      setPosition({ x: 0, y: 0 });
-      setIsProcessing(false);
-    }
+    if (!isOpen || !imageSrc) return;
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+    setIsProcessing(false);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      setNaturalSize({ width: w, height: h });
+      if (w > 0 && h > 0) {
+        const natRatio = w / h;
+        // Default immediately to the image's original ratio to preserve vertical smartphone photos
+        setCurrentRatio(natRatio);
+        setActiveRatioKey('original');
+        if (h > w) {
+          setPreviewDevice('mobile');
+        }
+      }
+    };
+    img.src = imageSrc;
   }, [isOpen, imageSrc]);
 
   // Touch & Mouse Drag handlers
@@ -88,6 +109,27 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
     setPosition({ x: 0, y: -maxOffset });
   };
 
+  // Ratio Presets
+  const getPresetRatio = (key: AspectPresetKey): number => {
+    if (key === 'original') {
+      return naturalSize.width && naturalSize.height
+        ? naturalSize.width / naturalSize.height
+        : 1;
+    }
+    if (key === 'portrait_9_16') return 9 / 16;
+    if (key === 'portrait_4_5') return 4 / 5;
+    if (key === 'square') return 1;
+    if (key === 'landscape_16_10') return 16 / 10;
+    return 1;
+  };
+
+  const handleSelectRatio = (key: AspectPresetKey) => {
+    setActiveRatioKey(key);
+    setCurrentRatio(getPresetRatio(key));
+    setPosition({ x: 0, y: 0 });
+    setZoom(1);
+  };
+
   // Generate cropped blob from canvas
   const handleValidateCrop = async () => {
     if (!imageRef.current || !containerRef.current) return;
@@ -100,9 +142,14 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const containerRect = container.getBoundingClientRect();
       const imgRect = img.getBoundingClientRect();
 
-      // Target canvas resolution (1600 x 1000 for sharp 16:10 retina display)
-      const exportWidth = 1600;
-      const exportHeight = Math.round(exportWidth / aspectRatio);
+      // Target canvas resolution (dynamic based on selected aspect ratio)
+      let exportWidth = 1400;
+      let exportHeight = Math.round(exportWidth / currentRatio);
+      if (currentRatio < 1) {
+        // Vertical photo (smartphone / portrait)
+        exportHeight = 1600;
+        exportWidth = Math.round(1600 * currentRatio);
+      }
 
       const canvas = document.createElement('canvas');
       canvas.width = exportWidth;
@@ -152,7 +199,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
       });
 
       const cleanBaseName = fileName.replace(/\.[^.]+$/, '');
-      const croppedFileName = `${cleanBaseName}-cadre-16x10.webp`;
+      const croppedFileName = `${cleanBaseName}-cadre.webp`;
 
       await onCropComplete(blob, croppedFileName);
       onClose();
@@ -178,10 +225,12 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
             <Sparkles className="h-4 w-4 text-stone" />
             <div>
               <h3 className="font-serif text-lg font-medium text-ivory sm:text-xl">
-                Recadrer &amp; Ajuster la photo
+                Cadrage &amp; Format du visuel
               </h3>
               <p className="text-[11px] text-stone/75">
-                Format standard des prestations (16:10) — adapté smartphone, tablette et écran.
+                {naturalSize.width > 0 && naturalSize.height > 0
+                  ? `Photo d’origine : ${naturalSize.width}×${naturalSize.height}px (${naturalSize.height > naturalSize.width ? 'Verticale' : 'Horizontale'})`
+                  : 'Ajustez le format sans couper votre photo.'}
               </p>
             </div>
           </div>
@@ -196,73 +245,57 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </button>
         </div>
 
-        {/* Device simulation indicator */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/40 px-5 py-2.5 text-xs text-stone">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] tracking-wider uppercase text-stone/70">
-              Aperçu selon l’écran :
+        {/* Ratio Selector Buttons Bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-black/60 px-5 py-2.5 text-xs text-stone">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] tracking-wider uppercase text-stone/80 mr-1">
+              Format de recadrage :
             </span>
-            <div className="flex items-center gap-1 border border-white/10 bg-obsidian p-0.5">
+
+            {[
+              {
+                key: 'original',
+                label: '✨ Original',
+                sub: naturalSize.width ? `${naturalSize.width}×${naturalSize.height}` : '100%',
+              },
+              { key: 'portrait_9_16', label: '📱 Story 9:16', sub: 'Vertical phone' },
+              { key: 'portrait_4_5', label: '📸 Portrait 4:5', sub: 'Instagram' },
+              { key: 'square', label: '⏹️ Carré 1:1', sub: 'Carré' },
+              { key: 'landscape_16_10', label: '🖥️ Paysage 16:10', sub: 'Écran' },
+            ].map((p) => (
               <button
+                key={p.key}
                 type="button"
-                onClick={() => setPreviewDevice('desktop')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] transition-colors ${
-                  previewDevice === 'desktop'
-                    ? 'bg-ivory text-obsidian font-semibold'
-                    : 'text-stone hover:text-ivory'
+                onClick={() => handleSelectRatio(p.key as AspectPresetKey)}
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] border transition-colors cursor-pointer ${
+                  activeRatioKey === p.key
+                    ? 'border-ivory bg-ivory text-obsidian font-bold'
+                    : 'border-white/15 bg-white/5 text-stone hover:text-ivory hover:border-white/30'
                 }`}
               >
-                <Monitor className="h-3 w-3" />
-                <span>Ordinateur</span>
+                <span>{p.label}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('tablet')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] transition-colors ${
-                  previewDevice === 'tablet'
-                    ? 'bg-ivory text-obsidian font-semibold'
-                    : 'text-stone hover:text-ivory'
-                }`}
-              >
-                <Tablet className="h-3 w-3" />
-                <span>Tablette</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewDevice('mobile')}
-                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] transition-colors ${
-                  previewDevice === 'mobile'
-                    ? 'bg-ivory text-obsidian font-semibold'
-                    : 'text-stone hover:text-ivory'
-                }`}
-              >
-                <Smartphone className="h-3 w-3" />
-                <span>Smartphone</span>
-              </button>
-            </div>
+            ))}
           </div>
 
           <div className="flex items-center gap-1.5 text-[11px] text-stone/80">
             <Move className="h-3.5 w-3.5 text-stone" />
-            <span>Glissez pour déplacer · Zoomez ci-dessous</span>
+            <span>Glissez pour déplacer</span>
           </div>
         </div>
 
         {/* Viewport de recadrage interactif */}
-        <div className="flex flex-1 items-center justify-center overflow-hidden bg-black/70 p-4 sm:p-6">
-          <div
-            className={`transition-all duration-300 w-full ${
-              previewDevice === 'mobile'
-                ? 'max-w-[340px]'
-                : previewDevice === 'tablet'
-                ? 'max-w-[540px]'
-                : 'max-w-[700px]'
-            }`}
-          >
-            {/* Fenêtre de cadrage avec ratio strict 16:10 */}
+        <div className="flex flex-1 items-center justify-center overflow-hidden bg-black/80 p-4 sm:p-6 min-h-[300px]">
+          <div className="flex w-full items-center justify-center">
+            {/* Fenêtre de cadrage avec ratio interactif et adaptation dynamique */}
             <div
               ref={containerRef}
-              style={{ aspectRatio: `${aspectRatio}` }}
+              style={{
+                aspectRatio: `${currentRatio}`,
+                maxHeight: '52vh',
+                maxWidth: currentRatio < 1 ? '340px' : (previewDevice === 'mobile' ? '340px' : previewDevice === 'tablet' ? '540px' : '680px'),
+                width: '100%',
+              }}
               onMouseDown={(e) => handleStartDrag(e.clientX, e.clientY)}
               onMouseMove={(e) => handleMoveDrag(e.clientX, e.clientY)}
               onMouseUp={handleEndDrag}
@@ -274,7 +307,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 if (e.touches[0]) handleMoveDrag(e.touches[0].clientX, e.touches[0].clientY);
               }}
               onTouchEnd={handleEndDrag}
-              className="relative w-full overflow-hidden border-2 border-ivory/80 bg-obsidian cursor-grab active:cursor-grabbing select-none shadow-[0_0_40px_rgba(0,0,0,0.8)]"
+              className="relative overflow-hidden border-2 border-ivory/90 bg-obsidian cursor-grab active:cursor-grabbing select-none shadow-[0_0_40px_rgba(0,0,0,0.85)]"
             >
               <img
                 ref={imageRef}
@@ -297,8 +330,8 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 <div className="border-r border-b border-white/15" />
                 <div className="border-r border-b border-white/15" />
                 <div className="border-b border-white/15" />
-                <div className="border-r border-white/15" />
-                <div className="border-r border-white/15" />
+                <div className="border-r border-b border-white/15" />
+                <div className="border-r border-b border-white/15" />
                 <div />
               </div>
 
@@ -357,7 +390,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 onClick={alignTop}
                 className="border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] text-ivory hover:border-ivory"
               >
-                Haut (Yeux / Cils)
+                Haut
               </button>
               <button
                 type="button"
@@ -411,7 +444,7 @@ export const ImageCropModal: React.FC<ImageCropModalProps> = ({
               ) : (
                 <>
                   <Check className="h-4 w-4" />
-                  <span>Valider et appliquer le recadrage</span>
+                  <span>Valider et appliquer le format</span>
                 </>
               )}
             </button>

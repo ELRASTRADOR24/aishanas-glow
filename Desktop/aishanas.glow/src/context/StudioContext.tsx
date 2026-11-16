@@ -150,9 +150,10 @@ function normalizeStudio(raw: Partial<StudioData> | null | undefined): StudioDat
     },
     services: (raw.services ?? DEFAULT_STUDIO_DATA.services).map((s) => ({
       ...s,
-      durationMinutes: 120,
+      durationMinutes: Number(s.durationMinutes) || 120,
       active: s.category === 'blanchiment' ? (s.active === true ? false : s.active ?? false) : s.active ?? true,
       showImage: s.showImage ?? true,
+      mediaFormat: s.mediaFormat || 'dynamic',
     })),
     addons: raw.addons ?? DEFAULT_STUDIO_DATA.addons,
     protocols: raw.protocols ?? DEFAULT_STUDIO_DATA.protocols,

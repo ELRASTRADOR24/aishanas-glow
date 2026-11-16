@@ -241,15 +241,12 @@ function loadStudio() {
     existingConfig.exactStudioAddress || '2 rue du Général Gallieni, 85000 La Roche-sur-Yon';
 
   const sanitizedServices = (existing.services || DEFAULT_SERVER_STUDIO.services).map((s) => {
-    let duration = s.durationMinutes;
+    let duration = Number(s.durationMinutes) || 120;
     let active = s.active;
-    if (s.category === 'extensions') {
-      duration = 120;
-    }
     if (s.category === 'blanchiment' && active !== false) {
       active = false;
     }
-    return { ...s, durationMinutes: duration, active };
+    return { ...s, durationMinutes: duration, active, mediaFormat: s.mediaFormat || 'dynamic' };
   });
 
   memoryStudio = {
@@ -869,8 +866,7 @@ function requireAdmin(req, res, next) {
 
 function getServiceDuration(studio, serviceId) {
   const srv = (studio.services || []).find((s) => s.id === serviceId);
-  if (srv?.category === 'extensions') return 120;
-  return srv?.durationMinutes || 120;
+  return Number(srv?.durationMinutes) || 120;
 }
 
 function buildPublicStudio(studio) {
@@ -900,8 +896,9 @@ function buildPublicStudio(studio) {
   const publicServices = (studio.services || []).map((s) => {
     return {
       ...s,
-      durationMinutes: 120,
+      durationMinutes: Number(s.durationMinutes) || 120,
       active: s.category === 'blanchiment' ? false : s.active,
+      mediaFormat: s.mediaFormat || 'dynamic',
     };
   });
 

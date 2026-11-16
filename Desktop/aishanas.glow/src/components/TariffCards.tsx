@@ -2,19 +2,28 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowUpRight, Sparkles } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
-import type { BookingVariant, ServiceCategory, ServiceItem } from '../types/studio';
+import type { BookingVariant, ServiceItem } from '../types/studio';
 import { AestheticMediaViewer } from './AestheticMediaViewer';
 
 interface TariffCardsProps {
   onSelectServiceForBooking?: (serviceId: string, variant: BookingVariant) => void;
 }
 
-const CATEGORY_NAMES: Record<ServiceCategory, string> = {
+const CATEGORY_NAMES: Record<string, string> = {
   extensions: 'Extensions',
   depose: 'Dépose',
   rehaussement: 'Rehaussement',
   blanchiment: 'Blanchiment',
 };
+
+function formatDuration(minutes?: number): string {
+  const mins = Number(minutes) || 120;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m} min`;
+  return `${h}h${m < 10 ? '0' : ''}${m}`;
+}
 
 export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBooking }) => {
   const { data } = useStudio();
@@ -52,13 +61,17 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
           </p>
         </div>
 
-        {/* Grille de cartes épurées — Bords carrés, ultra-propres et luxueuses */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Grille de cartes épurées — S'adapte dynamiquement au format des médias (vertical, carré, paysage) */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 items-start">
           {activeServices.map((service) => {
             const defaultVariant: BookingVariant =
               service.category === 'depose' || service.category === 'blanchiment'
                 ? 'standard'
                 : 'full';
+
+            const categoryBadgeLabel =
+              CATEGORY_NAMES[service.category] ||
+              service.category.charAt(0).toUpperCase() + service.category.slice(1).replace(/-/g, ' ');
 
             return (
               <div
@@ -66,14 +79,15 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                 className="group flex flex-col justify-between border border-charcoal/15 bg-white transition-all duration-300 hover:border-charcoal hover:shadow-[0_16px_36px_-18px_rgba(20,19,17,0.18)]"
               >
                 <div>
-                  {/* Zone Média : Clic réservé à la visualisation, pas de redirection vers la réservation */}
+                  {/* Zone Média : S'adapte dynamiquement sans forcer de ratio ni couper les photos verticales */}
                   <div onClick={(e) => e.stopPropagation()}>
                     {shouldShowImage(service) && service.imageUrl ? (
                       <AestheticMediaViewer
                         url={service.imageUrl}
                         alt={service.name}
-                        badge={CATEGORY_NAMES[service.category] || service.category}
-                        aspectRatioClass="aspect-[16/10]"
+                        badge={categoryBadgeLabel}
+                        aspectRatioClass="dynamic"
+                        mediaFormat={service.mediaFormat || 'dynamic'}
                         allowExpand={true}
                         onBook={() => handleBookClick(service, defaultVariant)}
                       />
@@ -85,7 +99,7 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                         </span>
                         <div className="absolute top-3 left-3 z-10">
                           <span className="border border-charcoal/20 bg-white/95 px-2.5 py-0.5 text-[10px] font-medium tracking-widest text-charcoal uppercase">
-                            {CATEGORY_NAMES[service.category] || service.category}
+                            {categoryBadgeLabel}
                           </span>
                         </div>
                       </div>
@@ -106,7 +120,7 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
                         )}
                         <div className="mt-2.5 flex items-center gap-2">
                           <span className="inline-flex items-center border border-charcoal/10 bg-ivory/60 px-2.5 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
-                            Durée : 2h
+                            Durée : {formatDuration(service.durationMinutes)}
                           </span>
                         </div>
                       </div>

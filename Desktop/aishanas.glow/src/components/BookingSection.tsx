@@ -29,12 +29,21 @@ interface BookingSectionProps {
   selectionTick: number;
 }
 
-const CATEGORY_LABELS: Record<ServiceCategory, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   extensions: 'Extensions de cils',
   rehaussement: 'Rehaussement de cils',
   blanchiment: 'Blanchiment dentaire',
   depose: 'Dépose',
 };
+
+function formatDuration(minutes?: number): string {
+  const mins = Number(minutes) || 120;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return `${h}h`;
+  if (h === 0) return `${m} min`;
+  return `${h}h${m < 10 ? '0' : ''}${m}`;
+}
 
 export const BookingSection: React.FC<BookingSectionProps> = ({
   preselectedServiceId,
@@ -107,13 +116,24 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
     [activeServices, selectedCategory]
   );
 
+  const availableCategories = useMemo(() => {
+    const list: string[] = [];
+    ['extensions', 'rehaussement', 'blanchiment', 'depose'].forEach((cat) => {
+      if (activeServices.some((s) => s.category === cat)) list.push(cat);
+    });
+    activeServices.forEach((s) => {
+      if (s.category && !list.includes(s.category)) list.push(s.category);
+    });
+    return list;
+  }, [activeServices]);
+
   const dayAvailability = useMemo(
     () =>
       getDayAvailability(
         preferredDate,
         bookingRules,
         data.occupiedSlots,
-        currentService?.category === 'extensions' ? 120 : currentService?.durationMinutes || 120
+        currentService?.durationMinutes || 120
       ),
     [preferredDate, bookingRules, data.occupiedSlots, currentService]
   );
@@ -425,28 +445,27 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
               </div>
 
               {/* Sélecteur de catégorie rapide */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(['extensions', 'rehaussement', 'blanchiment', 'depose'] as ServiceCategory[]).map(
-                  (cat) => {
-                    const hasItems = activeServices.some((s) => s.category === cat);
-                    if (!hasItems) return null;
-                    const active = selectedCategory === cat;
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => handleCategoryChange(cat)}
-                        className={`min-h-[44px] border px-3 py-2 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer ${
-                          active
-                            ? 'border-charcoal bg-charcoal text-ivory'
-                            : 'border-stone bg-paper text-charcoal hover:border-charcoal'
-                        }`}
-                      >
-                        {CATEGORY_LABELS[cat]}
-                      </button>
-                    );
-                  }
-                )}
+              <div className="flex flex-wrap gap-2">
+                {availableCategories.map((cat) => {
+                  const active = selectedCategory === cat;
+                  const label =
+                    CATEGORY_LABELS[cat] ||
+                    cat.charAt(0).toUpperCase() + cat.slice(1).replace(/-/g, ' ');
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => handleCategoryChange(cat as ServiceCategory)}
+                      className={`min-h-[44px] flex-1 min-w-[120px] border px-3 py-2 text-xs font-medium tracking-wider uppercase transition-colors cursor-pointer ${
+                        active
+                          ? 'border-charcoal bg-charcoal text-ivory font-semibold'
+                          : 'border-stone bg-paper text-charcoal hover:border-charcoal'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Carte résumé de la prestation active */}
@@ -484,7 +503,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                       </div>
                       <div className="mt-1 flex items-center gap-2">
                         <span className="inline-flex items-center border border-charcoal/15 bg-white px-2 py-0.5 text-[10px] font-medium tracking-wider text-charcoal uppercase">
-                          Durée : {currentService.category === 'extensions' ? '2h' : `${currentService.durationMinutes} min`}
+                          Durée : {formatDuration(currentService.durationMinutes)}
                         </span>
                       </div>
                       {currentService.description && (
@@ -1030,7 +1049,7 @@ export const BookingSection: React.FC<BookingSectionProps> = ({
                 <div className="flex justify-between">
                   <span className="text-taupe">Durée prévue :</span>
                   <span className="font-medium">
-                    {currentService?.category === 'extensions' ? '2h (120 min)' : `${currentService?.durationMinutes || 60} min`}
+                    {formatDuration(currentService?.durationMinutes)} ({currentService?.durationMinutes || 120} min)
                   </span>
                 </div>
                 <div className="flex justify-between">

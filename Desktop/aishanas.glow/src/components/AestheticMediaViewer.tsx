@@ -1,11 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize2, X, Sparkles } from 'lucide-react';
 import { isVideoUrl, optimizeCloudinaryUrl } from '../utils/cloudinary';
 
 interface AestheticMediaViewerProps {
   url?: string;
   alt?: string;
-  aspectRatioClass?: string;
+  aspectRatioClass?: string; // 'dynamic' or explicit class like 'aspect-[16/10]'
   className?: string;
   allowExpand?: boolean;
   autoPlayMuted?: boolean;
@@ -13,19 +13,21 @@ interface AestheticMediaViewerProps {
   badge?: string;
   objectPosition?: string;
   onBook?: () => void;
+  mediaFormat?: 'dynamic' | 'vertical' | 'square' | 'horizontal';
 }
 
 export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   url,
   alt = 'Visuel prestation',
-  aspectRatioClass = 'aspect-[16/10]',
+  aspectRatioClass = 'dynamic',
   className = '',
   allowExpand = true,
   autoPlayMuted = true,
   showControls = true,
   badge,
-  objectPosition = 'center 35%',
+  objectPosition = 'center center',
   onBook,
+  mediaFormat = 'dynamic',
 }) => {
   const [isPlaying, setIsPlaying] = useState(autoPlayMuted);
   const [isMuted, setIsMuted] = useState(true);
@@ -34,24 +36,55 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [mediaError, setMediaError] = useState(false);
   const [isVerticalVideo, setIsVerticalVideo] = useState(false);
+  const [detectedRatio, setDetectedRatio] = useState<number | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const modalVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const isVideo = isVideoUrl(url);
 
-  // Reset error when URL changes
+  // Reset states when URL changes
   useEffect(() => {
     setMediaError(false);
     setProgress(0);
     setIsVerticalVideo(false);
+    setDetectedRatio(null);
   }, [url]);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth && img.naturalHeight) {
+      setDetectedRatio(img.naturalWidth / img.naturalHeight);
+    }
+  };
 
   const handleVideoMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
     const v = e.currentTarget;
+    if (v.videoWidth && v.videoHeight) {
+      setDetectedRatio(v.videoWidth / v.videoHeight);
+    }
     if (v.videoHeight > v.videoWidth) {
       setIsVerticalVideo(true);
     }
   };
+
+  // Determine effective aspect ratio
+  const targetRatio = useMemo(() => {
+    if (mediaFormat === 'vertical') return 4 / 5;
+    if (mediaFormat === 'square') return 1;
+    if (mediaFormat === 'horizontal') return 16 / 10;
+
+    if (aspectRatioClass && aspectRatioClass !== 'dynamic') {
+      return null; // Tailwind aspect class specified
+    }
+
+    if (detectedRatio) {
+      // Dynamic mode: clamp safely between 9:16 (0.5625) and 21:9 (2.33)
+      return Math.max(0.56, Math.min(2.2, detectedRatio));
+    }
+
+    return null;
+  }, [mediaFormat, aspectRatioClass, detectedRatio]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -102,7 +135,9 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
   if (!url || mediaError) {
     return (
       <div
-        className={`relative ${aspectRatioClass} w-full overflow-hidden bg-ivory/60 border-b border-charcoal/10 flex flex-col items-center justify-center p-6 text-center text-taupe ${className}`}
+        className={`relative ${
+          aspectRatioClass && aspectRatioClass !== 'dynamic' ? aspectRatioClass : 'aspect-[16/10]'
+        } w-full overflow-hidden bg-ivory/60 border-b border-charcoal/10 flex flex-col items-center justify-center p-6 text-center text-taupe ${className}`}
       >
         <Sparkles className="h-6 w-6 opacity-40 mb-1" />
         <span className="text-[10px] uppercase tracking-widest font-medium">Alshana's Glow</span>
@@ -118,12 +153,26 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
         onMouseLeave={() => setIsHovered(false)}
         onClick={openModal}
         title={isVideo ? 'Cliquer pour visionner la vidéo en grand format' : "Cliquer pour agrandir l'image"}
-        className={`group relative ${aspectRatioClass} w-full overflow-hidden bg-obsidian border-b border-charcoal/10 select-none cursor-pointer ${className}`}
+        style={
+          targetRatio
+            ? {
+                aspectRatio: `${targetRatio}`,
+                maxHeight: '72vh',
+              }
+            : undefined
+        }
+        className={`group relative ${
+          targetRatio
+            ? ''
+            : aspectRatioClass && aspectRatioClass !== 'dynamic'
+            ? aspectRatioClass
+            : 'aspect-[16/10]'
+        } w-full overflow-hidden bg-obsidian border-b border-charcoal/10 select-none cursor-pointer ${className}`}
       >
         {isVideo ? (
           <div className="relative h-full w-full overflow-hidden">
-            {/* Arrière-plan flou d'ambiance pour les vidéos verticales afin d'éliminer les bandes noires */}
-            {isVerticalVideo && (
+            {/* Arrière-plan flou d'ambiance uniquement si ratio fixe différent du média */}
+            {isVerticalVideo && !targetRatio && (
               <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
                 <video
                   src={url}
@@ -148,7 +197,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
               onLoadedMetadata={handleVideoMetadata}
               onError={() => setMediaError(true)}
               style={{ objectPosition }}
-              className={`relative z-10 h-full w-full ${isVerticalVideo ? 'object-contain mx-auto' : 'object-cover'} transition-transform duration-500 group-hover:scale-105`}
+              className="relative z-10 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
 
             {/* Custom Aesthetic Controls Overlay avec z-20 pour une interactivité immédiate */}
@@ -236,9 +285,10 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
         ) : (
           <div className="relative h-full w-full">
             <img
-              src={optimizeCloudinaryUrl(url, 600)}
+              src={optimizeCloudinaryUrl(url, 1200)}
               alt={alt}
               loading="lazy"
+              onLoad={handleImageLoad}
               onError={() => setMediaError(true)}
               style={{ objectPosition }}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
