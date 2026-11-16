@@ -56,9 +56,11 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
           <h2 id="tarifs-heading" className="mt-2 font-serif text-3xl text-charcoal sm:text-5xl font-normal">
             {data.config.tarifsTitle || 'Prestations & Tarifs'}
           </h2>
-          <p className="mt-2 text-xs tracking-wide text-taupe sm:text-sm">
-            {data.config.tarifsSubtitle || 'Cliquez sur une prestation pour choisir votre créneau.'}
-          </p>
+          {data.config.tarifsSubtitle && (
+            <p className="mt-2 text-xs tracking-wide text-taupe sm:text-sm">
+              {data.config.tarifsSubtitle}
+            </p>
+          )}
         </div>
 
         {/* Grille de cartes épurées — S'adapte dynamiquement au format des médias (vertical, carré, paysage) */}
@@ -153,17 +155,6 @@ export const TariffCards: React.FC<TariffCardsProps> = ({ onSelectServiceForBook
               </div>
             );
           })}
-        </div>
-
-        {/* Note sobre vers la FAQ */}
-        <div className="mt-10 text-center text-xs text-taupe">
-          <span>Déposes gratuites avec nouvelle pose, délais de remplissage et créneaux flexibles : </span>
-          <a
-            href="#faq"
-            className="font-medium text-charcoal underline underline-offset-4 hover:opacity-70 transition-opacity"
-          >
-            consulter les questions fréquentes (FAQ)
-          </a>
         </div>
       </div>
     </section>
