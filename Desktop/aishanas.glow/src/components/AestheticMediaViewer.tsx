@@ -157,7 +157,6 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={openModal}
-        title={isVideo ? 'Cliquer pour visionner la vidéo en grand format' : "Cliquer pour agrandir l'image"}
         style={
           targetRatio
             ? {
@@ -237,8 +236,8 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
                   )}
                 </div>
 
-                {/* Center subtle Play/Pause & View Prompt */}
-                <div className="flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                {/* Center Play/Pause button */}
+                <div className="flex items-center justify-center pointer-events-none">
                   <div className="pointer-events-auto">
                     <button
                       type="button"
@@ -249,9 +248,6 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
                       {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5 translate-x-0.5" />}
                     </button>
                   </div>
-                  <span className="text-[9px] tracking-wider text-ivory/90 uppercase font-medium drop-shadow-sm">
-                    {isPlaying ? 'Pause' : 'Lire'} · Cliquez pour agrandir
-                  </span>
                 </div>
 
                 {/* Bottom toolbar with progress & sound */}
@@ -261,18 +257,9 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
                       type="button"
                       onClick={toggleMute}
                       aria-label={isMuted ? 'Activer le son' : 'Couper le son'}
-                      className="flex items-center gap-1 rounded bg-obsidian/60 px-2 py-0.5 text-ivory backdrop-blur-xs hover:bg-obsidian cursor-pointer"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-obsidian/70 text-ivory backdrop-blur-xs hover:bg-obsidian cursor-pointer transition-colors"
                     >
                       {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                      <span className="text-[9px] tracking-wider uppercase">{isMuted ? 'Son coupé' : 'Son activé'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={openModal}
-                      className="text-[9px] tracking-widest uppercase text-ivory/80 hover:text-white"
-                    >
-                      Plein écran ↗
                     </button>
                   </div>
 
