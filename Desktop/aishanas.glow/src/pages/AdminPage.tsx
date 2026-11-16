@@ -445,10 +445,6 @@ export const AdminPage: React.FC = () => {
             <Lock className="h-5 w-5 text-stone" aria-hidden="true" />
             <h1 className="font-serif text-3xl text-ivory">Administration</h1>
           </div>
-          <p className="mt-2 text-xs leading-relaxed text-stone/80">
-            Espace de gestion {data.config.brandName} — validation des rendez-vous, horaires,
-            tarifs et photos du studio.
-          </p>
 
           <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div className="space-y-1.5">
@@ -488,7 +484,7 @@ export const AdminPage: React.FC = () => {
                   type={showPasscode ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  placeholder="Code secret administrateur"
+                  placeholder="Mot de passe"
                   value={passcodeInput}
                   onChange={(e) => {
                     setPasscodeInput(e.target.value);
@@ -525,16 +521,6 @@ export const AdminPage: React.FC = () => {
             >
               {loggingIn ? 'Connexion...' : 'Accéder au tableau de bord'}
             </button>
-
-            <div className="border-t border-white/10 pt-3 space-y-1.5 text-[11px] text-stone/75">
-              <div className="flex items-center gap-1.5 text-sand">
-                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Session persistante active : vous restez connecté(e) sur cet appareil.</span>
-              </div>
-              <p>
-                Code initial : <code>alshana2026</code> (modifiable dans vos paramètres).
-              </p>
-            </div>
           </form>
         </div>
       </div>
