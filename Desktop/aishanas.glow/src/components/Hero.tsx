@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowDownRight, MapPin } from 'lucide-react';
 import { useStudio } from '../context/StudioContext';
 
@@ -34,13 +35,13 @@ export const Hero: React.FC = () => {
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <a
-            href="/reserver"
+          <Link
+            to="/reserver"
             className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 border border-ivory bg-ivory px-8 py-3 text-xs font-semibold tracking-[0.2em] text-obsidian uppercase transition-colors hover:bg-stone sm:w-auto"
           >
             <span>{config.heroCtaText || 'Réserver un soin'}</span>
             <ArrowDownRight className="h-4 w-4" aria-hidden="true" />
-          </a>
+          </Link>
           <a
             href="#tarifs"
             onClick={(e) => {

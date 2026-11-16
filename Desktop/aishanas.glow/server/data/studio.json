@@ -57,35 +57,36 @@
   "services": [
     {
       "id": "ext-cil-a-cil",
-      "category": "extensions",
+      "category": "soins-regard",
       "name": "Cil à cil",
       "subtitle": "Effet naturel et structuré",
       "fullPrice": 40,
       "fullLabel": "Pose complète",
       "refillPrice": 30,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 120,
+      "durationMinutes": 90,
       "description": "Une extension posée sur chaque cil naturel pour allonger et définir le regard tout en finesse.",
-      "note": "Pas de remplissages successifs possibles",
       "imageUrl": "/srv-cil-a-cil.jpg",
       "showImage": true,
-      "supportsLashOptions": true,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic",
+      "supportsLashOptions": true
     },
     {
       "id": "ext-pose-mixte",
-      "category": "extensions",
+      "category": "soins-regard",
       "name": "Pose mixte (cil à cil + 4D)",
       "subtitle": "Équilibre entre naturel et intensité",
       "fullPrice": 45,
       "fullLabel": "Pose complète",
       "refillPrice": 35,
       "refillLabel": "Remplissage 3 semaines",
-      "durationMinutes": 120,
+      "durationMinutes": 90,
       "description": "Association harmonieuse de cil à cil et de bouquets 4D pour un regard texturé et étoffé.",
       "imageUrl": "https://res.cloudinary.com/dvecpg1tz/video/upload/c_limit,w_1080/q_auto:good,vc_auto/v1794702134/alshanas-glow/yifmdcidjplomztltjf7.mp4",
       "showImage": true,
       "active": true,
+      "mediaFormat": "dynamic",
       "supportsLashOptions": true
     },
     {
@@ -103,7 +104,8 @@
       "imageUrl": "/srv-volume-leger.jpg",
       "showImage": true,
       "supportsLashOptions": true,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "ext-volume-russe",
@@ -120,7 +122,8 @@
       "imageUrl": "/srv-volume-russe.jpg",
       "showImage": true,
       "supportsLashOptions": true,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "ext-whispy-manga",
@@ -137,7 +140,8 @@
       "imageUrl": "/srv-whispy-manga.jpg",
       "showImage": true,
       "supportsLashOptions": true,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "dep-alshana",
@@ -152,7 +156,8 @@
       "imageUrl": "/srv-depose-studio.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "dep-exterieur",
@@ -167,7 +172,8 @@
       "imageUrl": "/srv-depose-exterieur.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "reh-cils",
@@ -184,7 +190,8 @@
       "imageUrl": "/srv-rehaussement.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": true
+      "active": true,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "bla-premiere",
@@ -200,7 +207,8 @@
       "imageUrl": "/srv-blanchiment-1.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": false
+      "active": false,
+      "mediaFormat": "dynamic"
     },
     {
       "id": "bla-deuxieme",
@@ -216,7 +224,8 @@
       "imageUrl": "/srv-blanchiment-2.jpg",
       "showImage": true,
       "supportsLashOptions": false,
-      "active": false
+      "active": false,
+      "mediaFormat": "dynamic"
     }
   ],
   "addons": [
@@ -423,35 +432,7 @@
       "active": true
     }
   ],
-  "bookings": [
-    {
-      "id": "bk-1794629501687",
-      "addonIds": [],
-      "addonNames": [],
-      "addonsPrice": 0,
-      "basePrice": 45,
-      "category": "extensions",
-      "clientEmail": "maydiesoums@gmail.com",
-      "clientInstagram": "@maydie_82",
-      "clientName": "Maydie ntary",
-      "clientPhone": "+33767663869",
-      "contraindicationsConfirmed": true,
-      "createdAt": "2026-11-14T04:11:41.687Z",
-      "isSupplementApplied": false,
-      "notes": "Je suis très sensible des yeux",
-      "preferredDate": "2026-11-25",
-      "preferredTime": "14:00",
-      "reference": "AG-7935",
-      "serviceId": "ext-pose-mixte",
-      "serviceName": "Pose mixte (cil à cil + 4D)",
-      "source": "web",
-      "status": "pending",
-      "supplementPrice": 0,
-      "totalPrice": 45,
-      "variant": "full",
-      "variantLabel": "Pose complète"
-    }
-  ],
+  "bookings": [],
   "emailLogs": [
     {
       "id": "mail-1794628078011-559",

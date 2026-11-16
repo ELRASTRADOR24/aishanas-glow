@@ -40,6 +40,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const modalVideoRef = useRef<HTMLVideoElement | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   const isVideo = isVideoUrl(url);
 
@@ -49,6 +50,10 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
     setProgress(0);
     setIsVerticalVideo(false);
     setDetectedRatio(null);
+
+    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth) {
+      setDetectedRatio(imgRef.current.naturalWidth / imgRef.current.naturalHeight);
+    }
   }, [url]);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -285,6 +290,7 @@ export const AestheticMediaViewer: React.FC<AestheticMediaViewerProps> = ({
         ) : (
           <div className="relative h-full w-full">
             <img
+              ref={imgRef}
               src={optimizeCloudinaryUrl(url, 1200)}
               alt={alt}
               loading="lazy"
